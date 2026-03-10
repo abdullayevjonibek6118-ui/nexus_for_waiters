@@ -1,0 +1,24 @@
+# Telegram Bot
+python-telegram-bot>=21.0
+
+# Supabase client (2.7.x — без зависимости от pyiceberg/pyroaring)
+supabase==2.7.4
+
+# Google Sheets API
+google-api-python-client>=2.114.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
+
+# Data validation (Python 3.14 compatible — берёт готовые wheels)
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# Scheduler
+APScheduler>=3.10.4
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Utilities
+pytz>=2024.1
+openpyxl>=3.1.2

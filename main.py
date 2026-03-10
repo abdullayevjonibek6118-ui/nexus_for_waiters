@@ -1,0 +1,132 @@
+"""
+Nexus AI Telegram Bot — Точка входа
+Регистрация всех хендлеров и запуск бота.
+"""
+import logging
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    PollAnswerHandler,
+    filters,
+)
+from config import settings
+
+# Хендлеры
+from handlers.start import start_command, help_command
+from handlers.event_handler import get_create_event_handler, list_events, handle_event_action_callback
+from handlers.poll_handler import publish_poll, close_poll, handle_poll_answer
+from handlers.candidate_handler import (
+    list_voters,
+    select_candidates_cmd,
+    set_times_cmd,
+    notify_candidates_cmd,
+    handle_toggle_select,
+    handle_save_selection,
+    handle_candidate_confirmation,
+    handle_contact,
+    handle_set_gender,
+)
+from handlers.admin_handler import (
+    create_sheet_cmd,
+    payment_reminder_cmd,
+    payment_confirmed_cmd,
+    logs_cmd,
+    close_event_cmd,
+    export_excel_cmd,
+    announce_cmd,
+)
+
+# Планировщик (инициализация)
+from services.scheduler_service import get_scheduler, get_scheduler_async
+
+
+def setup_logging():
+    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        level=log_level,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    # Уменьшим шуm от httpx
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def main() -> None:
+    setup_logging()
+    logger = logging.getLogger(__name__)
+
+    logger.info("🚀 Запуск Nexus AI Bot...")
+
+    async def on_startup(app):
+        """Запускается после старта event loop — безопасное место для планировщика."""
+        await get_scheduler_async()
+        
+        # Добавляем крон-задачу для ежедневных напоминаний
+        from services.scheduler_service import schedule_daily_reminders
+        await schedule_daily_reminders(app.bot)
+        
+        logger.info("✅ Планировщик задач запущен")
+
+    # Создать приложение с увеличенными таймаутами
+    app = (
+        Application.builder()
+        .token(settings.bot_token)
+        .post_init(on_startup)
+        .connect_timeout(30)
+        .read_timeout(60)
+        .write_timeout(60)
+        .build()
+    )
+
+    # ── Базовые команды ──────────────────────────────────────────────────────
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
+
+    # ── Мероприятия ─────────────────────────────────────────────────────────
+    app.add_handler(get_create_event_handler())           # ConversationHandler
+    app.add_handler(CommandHandler("list_events", list_events))
+
+    # ── Опросы ──────────────────────────────────────────────────────────────
+    app.add_handler(CommandHandler("publish_poll", publish_poll))
+    app.add_handler(CommandHandler("close_poll", close_poll))
+    app.add_handler(PollAnswerHandler(handle_poll_answer))
+
+    # ── Кандидаты ───────────────────────────────────────────────────────────
+    app.add_handler(CommandHandler("voters", list_voters))
+    app.add_handler(CommandHandler("select_candidates", select_candidates_cmd))
+    app.add_handler(CommandHandler("set_times", set_times_cmd))
+    app.add_handler(CommandHandler("notify_candidates", notify_candidates_cmd))
+
+    # ── Администратор ────────────────────────────────────────────────────────
+    app.add_handler(CommandHandler("create_sheet", create_sheet_cmd))
+    app.add_handler(CommandHandler("payment_reminder", payment_reminder_cmd))
+    app.add_handler(CommandHandler("payment_confirmed", payment_confirmed_cmd))
+    app.add_handler(CommandHandler("logs", logs_cmd))
+    app.add_handler(CommandHandler("export_excel", export_excel_cmd))
+    app.add_handler(CommandHandler("announce", announce_cmd))
+
+    # ── Callback-кнопки ─────────────────────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(handle_toggle_select,        pattern=r"^toggle_select:"))
+    app.add_handler(CallbackQueryHandler(handle_save_selection,       pattern=r"^save_selection:"))
+    app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^confirm_(yes|no):"))
+    app.add_handler(CallbackQueryHandler(
+        handle_event_action_callback,
+        pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel):"
+    ))
+    app.add_handler(CallbackQueryHandler(handle_set_gender, pattern=r"^set_gender:"))
+
+    # ── Неизвестные команды ──────────────────────────────────────────────────
+    app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
+    app.add_handler(MessageHandler(
+        filters.COMMAND,
+        lambda u, c: u.message.reply_text("❓ Неизвестная команда. Используйте /help")
+    ))
+
+    logger.info("✅ Все хендлеры зарегистрированы. Запуск polling...")
+    app.run_polling(drop_pending_updates=True)
+
+
+if __name__ == "__main__":
+    main()

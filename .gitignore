@@ -1,0 +1,21 @@
+# Environment variables (НИКОГДА не коммитить!)
+.env
+
+# Google credentials
+credentials/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
