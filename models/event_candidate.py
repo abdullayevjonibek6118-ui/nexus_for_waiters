@@ -11,4 +11,6 @@ class EventCandidate(BaseModel):
     selected: bool = False
     arrival_time: Optional[str] = None    # HH:MM (24h)
     departure_time: Optional[str] = None  # HH:MM (24h)
+    is_checked_in: bool = False
+    is_checkin_confirmed: bool = False
     confirmed: bool = False

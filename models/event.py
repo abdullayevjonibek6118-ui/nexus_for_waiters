@@ -24,10 +24,13 @@ class Event(BaseModel):
     title: str
     date: str                          # ISO date string: YYYY-MM-DD
     location: str
+    payment: Optional[str] = None
     max_candidates: int = 10
     status: EventStatus = EventStatus.DRAFT
     poll_id: Optional[str] = None
     sheet_url: Optional[str] = None
+    required_roles: list[str] = []
+    arrival_times: list[str] = []
     required_men: int = 0
     required_women: int = 0
     created_by: Optional[int] = None   # Telegram user_id рекрутера

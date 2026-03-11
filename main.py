@@ -15,20 +15,23 @@ from config import settings
 
 # Хендлеры
 from handlers.start import start_command, help_command
-from handlers.event_handler import get_create_event_handler, list_events, handle_event_action_callback
-from handlers.poll_handler import publish_poll, close_poll, handle_poll_answer
+from handlers.event_handler import get_create_event_handler, list_events, handle_event_action_callback, events_dashboard
+from handlers.onboarding_handler import get_onboarding_handler
+from handlers.poll_handler import publish_poll, close_poll
 from handlers.candidate_handler import (
     list_voters,
-    select_candidates_cmd,
+    show_candidate_cards,
     set_times_cmd,
     notify_candidates_cmd,
-    handle_toggle_select,
-    handle_save_selection,
     handle_candidate_confirmation,
     handle_contact,
     handle_set_gender,
     handle_set_time_callback,
     handle_time_message_input,
+    handle_card_callback,
+    handle_checkin,
+    handle_auto_select_input,
+    handle_general_name_input,
 )
 from handlers.admin_handler import (
     create_sheet_cmd,
@@ -90,16 +93,17 @@ def main() -> None:
 
     # ── Мероприятия ─────────────────────────────────────────────────────────
     app.add_handler(get_create_event_handler())           # ConversationHandler
+    app.add_handler(get_onboarding_handler())             # Onboarding
+    app.add_handler(CommandHandler("events", events_dashboard))
     app.add_handler(CommandHandler("list_events", list_events))
 
     # ── Опросы ──────────────────────────────────────────────────────────────
     app.add_handler(CommandHandler("publish_poll", publish_poll))
     app.add_handler(CommandHandler("close_poll", close_poll))
-    app.add_handler(PollAnswerHandler(handle_poll_answer))
 
     # ── Кандидаты ───────────────────────────────────────────────────────────
     app.add_handler(CommandHandler("voters", list_voters))
-    app.add_handler(CommandHandler("select_candidates", select_candidates_cmd))
+    app.add_handler(CommandHandler("candidates", show_candidate_cards))
     app.add_handler(CommandHandler("set_times", set_times_cmd))
     app.add_handler(CommandHandler("notify_candidates", notify_candidates_cmd))
 
@@ -116,20 +120,23 @@ def main() -> None:
     app.add_handler(get_super_admin_handler()) # ConversationHandler для создания компаний
 
     # ── Callback-кнопки ─────────────────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(handle_toggle_select,        pattern=r"^toggle_select:"))
-    app.add_handler(CallbackQueryHandler(handle_save_selection,       pattern=r"^save_selection:"))
-    app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^confirm_(yes|no):"))
+    app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^(confirm|inv)_(yes|no):"))
     app.add_handler(CallbackQueryHandler(
         handle_event_action_callback,
-        pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel):"
+        pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel|ev_[a-zA-Z0-9_]+|card_next)(:|$)"
     ))
+    app.add_handler(CallbackQueryHandler(handle_card_callback, pattern=r"^card_(accept|reject)"))
+    app.add_handler(CallbackQueryHandler(handle_checkin, pattern=r"^checkin_"))
     app.add_handler(CallbackQueryHandler(handle_set_gender, pattern=r"^set_gender:"))
     app.add_handler(CallbackQueryHandler(handle_role_callback, pattern=r"^role:"))
     app.add_handler(CallbackQueryHandler(sa_callback_handler, pattern=r"^sa:"))
     app.add_handler(CallbackQueryHandler(handle_set_time_callback, pattern=r"^st_(all|one):"))
 
     # ── Неизвестные команды ──────────────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_time_message_input))
+    # Обработка разных типов текстового ввода
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_auto_select_input), group=1)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_time_message_input), group=2)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_general_name_input), group=3)
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(
         filters.COMMAND,

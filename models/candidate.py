@@ -14,6 +14,8 @@ class Candidate(BaseModel):
     user_id: int                          # Telegram user_id (PK)
     first_name: str
     last_name: Optional[str] = None
+    full_name: Optional[str] = None
+    primary_role: Optional[str] = None
     phone_number: Optional[str] = None
     telegram_username: Optional[str] = None
     gender: Optional[str] = None           # 'Male' or 'Female'

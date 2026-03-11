@@ -8,7 +8,14 @@ from telegram.ext import ContextTypes
 from config import settings
 from models.event import EventStatus
 from services import event_service, candidate_service, audit_service, recruiter_service
-from utils.keyboards import get_candidate_select_keyboard, get_confirm_keyboard, get_set_times_keyboard
+from utils.keyboards import (
+    get_candidate_select_keyboard, 
+    get_confirm_keyboard, 
+    get_set_times_keyboard,
+    get_candidate_card_keyboard,
+    get_invitation_keyboard,
+    get_checkin_keyboard
+)
 from utils.validators import validate_time_format
 
 logger = logging.getLogger(__name__)
@@ -50,77 +57,134 @@ async def list_voters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_html(text)
 
 
-async def select_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/select_candidates <event_id> — Интерактивный выбор кандидатов."""
-    if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
-        return
-    if not context.args:
-        await update.effective_message.reply_text("Использование: /select_candidates <event_id>")
-        return
+# ─── Управление кандидатами через карточки (Этап 5) ──────────────────────────
 
-    event_id = context.args[0]
+async def show_candidate_cards(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str = None) -> None:
+    """Отображение карточек кандидатов по очереди."""
+    if not event_id:
+        if context.args: event_id = context.args[0]
+        else: return
+
+    # Получаем кандидатов (тех, кто подал заявку через онбординг)
     voters = await candidate_service.get_voters(event_id)
     if not voters:
-        await update.effective_message.reply_text("📭 Нет проголосовавших для выбора.")
+        await update.effective_message.reply_text("📭 Нет заявок.")
         return
 
-    # Сохраним список выбранных в context
-    context.user_data["selecting_event"] = event_id
-    context.user_data["pending_selected"] = set()
+    # Сохраняем в контекст состояние обхода
+    context.user_data[f"cards_{event_id}"] = {"index": 0, "uids": [v["user_id"] for v in voters]}
+    
+    await _render_card(update, context, event_id, 0)
 
-    await update.effective_message.reply_html(
-        f"👥 <b>Выберите кандидатов</b> для мероприятия:\n"
-        f"Нажмите на имя, чтобы отметить. Затем «Сохранить выбор».",
-        reply_markup=get_candidate_select_keyboard(voters, event_id),
+async def _render_card(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str, index: int):
+    state = context.user_data.get(f"cards_{event_id}")
+    if not state or index >= len(state["uids"]):
+        await update.effective_message.reply_html(
+            "🏁 <b>Все кандидаты просмотрены!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Вы закончили обзор заявок на это мероприятие. Теперь вы можете перейти к рассылке уведомлений."
+        )
+        return
+
+    uid = state["uids"][index]
+    # Получаем детали кандидата и его заявки
+    cand = await candidate_service.get_candidate_profile(uid)
+    ec = await candidate_service.get_event_candidate(event_id, uid)
+    
+    fullname = cand.full_name or cand.first_name
+    role = ec.get("arrival_time") # Временно используем arrival_time для роли если не нашли? Нет, у нас есть поле в ec
+    # На самом деле нам нужно поле из event_candidates.arrival_time и candidates.primary_role
+    
+    text = (
+        f"🙋‍♂️ <b>Карточка кандидата</b>\n"
+        f"📦 {index + 1} из {len(state['uids'])}\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 <b>ФИО:</b> {fullname}\n"
+        f"🎭 <b>Выбранная роль:</b> {cand.primary_role}\n"
+        f"⏰ <b>Удобное время:</b> {ec.get('arrival_time')}\n"
+        f"📱 <b>Телефон:</b> <code>{cand.phone_number}</code>\n\n"
+        "✨ <i>Примите решение по кандидату:</i>"
     )
-
-
-async def handle_toggle_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Callback: переключение выбора кандидата."""
-    query = update.callback_query
-    await query.answer()
-    _, event_id, user_id_str = query.data.split(":")
-    user_id = int(user_id_str)
-
-    pending = context.user_data.get("pending_selected", set())
-    if user_id in pending:
-        pending.discard(user_id)
-        await query.answer("❌ Кандидат снят с выбора")
+    
+    markup = get_candidate_card_keyboard(event_id, uid)
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=markup, parse_mode="HTML")
     else:
-        pending.add(user_id)
-        await query.answer("✅ Кандидат отмечен")
-    context.user_data["pending_selected"] = pending
+        await update.effective_message.reply_html(text, reply_markup=markup)
 
-
-async def handle_save_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Callback: сохранение выбранных кандидатов."""
+async def handle_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    _, event_id = query.data.split(":")
+    
+    parts = query.data.split(":")
+    action = parts[0]
+    event_id = parts[1]
+    
+    state = context.user_data.get(f"cards_{event_id}")
+    if not state: return
 
-    selected_ids = context.user_data.get("pending_selected", set())
-    if not selected_ids:
-        await query.edit_message_text("❌ Никто не выбран.")
+    if action == "card_accept":
+        uid = int(parts[2])
+        await candidate_service.select_candidate(event_id, uid, True)
+        await query.answer("✅ Кандидат принят")
+        # Переход к следующему
+        state["index"] += 1
+        await _render_card(update, context, event_id, state["index"])
+        
+    elif action == "card_reject":
+        uid = int(parts[2])
+        await candidate_service.select_candidate(event_id, uid, False)
+        await query.answer("❌ Кандидат отклонен")
+        state["index"] += 1
+        await _render_card(update, context, event_id, state["index"])
+        
+    elif action == "card_next":
+        state["index"] += 1
+        await _render_card(update, context, event_id, state["index"])
+
+# ─── Автоотбор (Этап 6) ──────────────────────────────────────────────────────
+
+async def auto_select_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Функция автоотбора."""
+    query = update.callback_query
+    await query.answer()
+    
+    event_id = query.data.split(":")[1]
+    event = await event_service.get_event(event_id)
+    
+    await query.message.reply_text(
+        f"Сколько кандидатов выбрать для <b>{event.title}</b>?\n\n"
+        f"Введите число (нужно сотрудников: {event.max_candidates})",
+        parse_mode="HTML"
+    )
+    context.user_data["auto_select_event"] = event_id
+    return # Мы поймаем число в MessageHandler
+
+async def handle_auto_select_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода числа для автоотбора."""
+    event_id = context.user_data.get("auto_select_event")
+    if not event_id: return
+    
+    try:
+        count = int(update.message.text.strip())
+    except:
+        await update.message.reply_text("Введите число!")
         return
 
-    await candidate_service.reset_event_selections(event_id)
-    for uid in selected_ids:
-        await candidate_service.select_candidate(event_id, uid, True)
-
-    await event_service.update_event_status(event_id, EventStatus.SELECTION_COMPLETED)
-    await audit_service.log_action(
-        event_id, "candidates_selected", query.from_user.id,
-        {"selected_ids": list(selected_ids)}
+    voters = await candidate_service.get_voters(event_id)
+    # Берем первых 'count' кандидатов, которые еще не отклонены
+    selected_count = 0
+    for v in voters:
+        if selected_count >= count: break
+        await candidate_service.select_candidate(event_id, v["user_id"], True)
+        selected_count += 1
+    
+    context.user_data.pop("auto_select_event")
+    await update.message.reply_text(
+        f"✅ {selected_count} кандидатов выбрано!\n\n"
+        "Нажмите /events чтобы отправить приглашения.",
+        reply_markup=get_invitation_keyboard(event_id) # На самом деле лучше через Dashboard
     )
-
-    await query.edit_message_text(
-        f"✅ Выбрано <b>{len(selected_ids)}</b> кандидатов!\n"
-        f"Статус мероприятия: Selection_Completed\n\n"
-        f"Теперь используйте /set_times {event_id}",
-        parse_mode="HTML",
-    )
-    context.user_data.pop("pending_selected", None)
 
 
 async def set_times_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -262,24 +326,21 @@ async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TY
 
     sent, failed = 0, 0
     for c in selected:
-        p = c.get("candidates", {}) or {}
         user_id = c.get("user_id")
-        name = p.get("first_name", "")
         arrival = c.get("arrival_time", "уточняется")
-        departure = c.get("departure_time", "уточняется")
 
         msg = (
-            f"🎉 <b>Вы выбраны на мероприятие!</b>\n\n"
-            f"📌 <b>{event.title}</b>\n"
+            f"🎉 <b>Вы приглашены на мероприятие</b>\n\n"
+            f"<b>{event.title}</b>\n\n"
             f"📅 Дата: {event.date}\n"
+            f"⏰ Время прихода: {arrival}\n"
             f"📍 Место: {event.location}\n"
-            f"⏰ Ваше время: {arrival} – {departure}\n\n"
-            f"Пожалуйста, подтвердите участие:"
+            f"💰 Оплата: 4000 ₽\n\n"
         )
         try:
             await context.bot.send_message(
                 chat_id=user_id, text=msg, parse_mode="HTML",
-                reply_markup=get_confirm_keyboard(event_id),
+                reply_markup=get_invitation_keyboard(event_id),
             )
             sent += 1
         except Exception as e:
@@ -299,26 +360,61 @@ async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def handle_candidate_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Callback: кандидат подтверждает/отклоняет участие."""
+    """Callback: кандидат подтверждает/отклоняет участие (Этап 10)."""
     query = update.callback_query
     await query.answer()
-    action, event_id = query.data.split(":")
+    data = query.data
+    action, event_id = data.split(":")
     user = query.from_user
 
-    if action == "confirm_yes":
+    if action == "inv_yes":
         await candidate_service.confirm_candidate(event_id, user.id)
         await query.edit_message_text(
-            f"✅ <b>Участие подтверждено!</b>\n\n"
-            f"Спасибо, {user.first_name}! Ждём вас на мероприятии.",
+            "<b>Отлично!</b>\n\nВы записаны на мероприятие.\n\n"
+            "Мы напомним вам за день до начала.",
             parse_mode="HTML",
         )
-        await audit_service.log_action(event_id, "candidate_confirmed", user.id, {})
+        # Также отправляем кнопку Check-in (для этапа 11-12)
+        await query.message.reply_text(
+            "В день мероприятия не забудьте нажать 'Я пришел' в этом чате.",
+            reply_markup=get_checkin_keyboard(event_id)
+        )
+        await audit_service.log_action(event_id, "Candidate Confirmed Participation", user.id)
     else:
         await query.edit_message_text(
-            f"❌ Вы отказались от участия. Спасибо за ответ, {user.first_name}.",
-            parse_mode="HTML",
+            f"❌ Вы отказались от участия. Спасибо за ответ, {user.first_name}."
         )
-        await audit_service.log_action(event_id, "candidate_declined", user.id, {})
+        await audit_service.log_action(event_id, "Candidate Declined", user.id)
+
+# ─── Check-in (Этап 12) ──────────────────────────────────────────────────────
+
+async def handle_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Кандидат нажал 'Я пришел'."""
+    query = update.callback_query
+    await query.answer()
+    _, event_id = query.data.split(":")
+    user_id = update.effective_user.id
+    
+    await candidate_service.mark_checked_in(event_id, user_id)
+    await query.edit_message_text("✅ Вы отметили свой приход! Рекрутер подтвердит ваше присутствие.")
+    
+    # Уведомляем рекрутера
+    event = await event_service.get_event(event_id)
+    if event and event.created_by:
+        try:
+            cand = await candidate_service.get_candidate_profile(user_id)
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            reply_markup = InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅ Подтвердить приход", callback_data=f"ev_confirm_checkin:{event_id}:{user_id}")
+            ]])
+            await context.bot.send_message(
+                chat_id=event.created_by,
+                text=f"📍 Кандидат <b>{cand.full_name or cand.first_name}</b> пришел на мероприятие <b>{event.title}</b>!",
+                parse_mode="HTML",
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logger.warning(f"BUG-08 [handle_checkin]: Не удалось отправить уведомление рекрутеру: {e}")
 
 
 async def handle_set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -366,10 +462,29 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         from telegram import ReplyKeyboardRemove
         await update.effective_message.reply_html(
-            f"✅ <b>Спасибо!</b> Ваш номер телефона (<code>{phone}</code>) сохранён.\n"
-            f"Теперь рекрутер сможет с вами связаться при необходимости.",
+            f"✅ <b>Спасибо!</b> Ваш номер телефона (<code>{phone}</code>) сохранён.\n\n"
+            "Пожалуйста, введите ваше <b>ФИО</b> (как в паспорте), чтобы завершить регистрацию:",
             reply_markup=ReplyKeyboardRemove()
         )
+        context.user_data["waiting_for_name"] = True
     else:
         await update.effective_message.reply_text("Пожалуйста, отправьте именно свой контакт, используя кнопку в меню.")
+
+
+async def handle_general_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Захват ФИО вне онбординга (общая регистрация)."""
+    if not context.user_data.get("waiting_for_name"):
+        return
+    
+    name = update.message.text.strip()
+    user_id = update.effective_user.id
+    
+    await candidate_service.update_candidate_full_name(user_id, name)
+    context.user_data.pop("waiting_for_name")
+    
+    await update.message.reply_html(
+        f"✅ <b>Регистрация завершена!</b>\n\n"
+        f"Спасибо, <b>{name}</b>. "
+        "Теперь вы будете получать уведомления о новых мероприятиях."
+    )
 

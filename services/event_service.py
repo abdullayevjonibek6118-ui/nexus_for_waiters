@@ -23,6 +23,8 @@ async def create_event(event: Event) -> Optional[Event]:
             "date": event.date,
             "location": event.location,
             "max_candidates": event.max_candidates,
+            "required_roles": event.required_roles,
+            "arrival_times": event.arrival_times,
             "required_men": event.required_men,
             "required_women": event.required_women,
             "status": event.status.value,

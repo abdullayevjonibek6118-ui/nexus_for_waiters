@@ -31,10 +31,13 @@ CREATE TABLE IF NOT EXISTS events (
     title TEXT NOT NULL,
     date DATE NOT NULL,
     location TEXT NOT NULL,
+    payment TEXT,
     max_candidates INTEGER NOT NULL DEFAULT 10,
     status TEXT NOT NULL DEFAULT 'Draft',
     poll_id TEXT,
     sheet_url TEXT,
+    required_roles JSONB DEFAULT '[]', -- Список нужных ролей
+    arrival_times JSONB DEFAULT '[]',  -- Доступные времена прихода
     required_men INTEGER NOT NULL DEFAULT 0,
     required_women INTEGER NOT NULL DEFAULT 0,
     created_by BIGINT, -- Telegram user_id рекрутера
@@ -46,6 +49,8 @@ CREATE TABLE IF NOT EXISTS candidates (
     user_id BIGINT PRIMARY KEY, -- Telegram user_id
     first_name TEXT NOT NULL,
     last_name TEXT DEFAULT '',
+    full_name TEXT DEFAULT '', -- ФИО как в паспорте
+    primary_role TEXT DEFAULT '', -- Основная роль (Промоутер и т.д.)
     phone_number TEXT DEFAULT '',
     telegram_username TEXT DEFAULT '',
     gender TEXT CHECK (gender IN ('Male', 'Female')),
@@ -62,9 +67,11 @@ CREATE TABLE IF NOT EXISTS event_candidates (
         vote_status IN ('yes', 'no', 'maybe')
     ),
     selected BOOLEAN DEFAULT FALSE,
-    arrival_time TEXT, -- HH:MM (24h)
+    arrival_time TEXT, -- Время, выбранное кандидатом
     departure_time TEXT, -- HH:MM (24h)
-    confirmed BOOLEAN DEFAULT FALSE,
+    is_checked_in BOOLEAN DEFAULT FALSE, -- Кандидат нажал "Я пришел"
+    is_checkin_confirmed BOOLEAN DEFAULT FALSE, -- Рекрутер подтвердил приход
+    confirmed BOOLEAN DEFAULT FALSE, -- Подтверждение участия заранее
     UNIQUE (event_id, user_id)
 );
 

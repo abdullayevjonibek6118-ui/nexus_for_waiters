@@ -8,11 +8,19 @@ from config import settings
 from services import recruiter_service, company_service, candidate_service
 from utils.keyboards import get_role_selection_keyboard, get_gender_keyboard
 
+from handlers.onboarding_handler import start_onboarding
+
 logger = logging.getLogger(__name__)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/start — Приветствие и выбор роли."""
     user = update.effective_user
+    args = context.args # Параметры после /start
+    
+    # ПРОВЕРКА DEEP LINKING (Этап 1)
+    if args and args[0].startswith("event_"):
+        event_id = args[0].replace("event_", "")
+        return await start_onboarding(update, context, event_id)
     
     # 1. Сначала проверяем, не Владелец ли это
     if user.id == settings.super_admin_id:
@@ -65,23 +73,30 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # 4. Если абсолютно новый пользователь — предлагаем выбор
     text = (
-        "👋 <b>Добро пожаловать в Nexus AI!</b>\n\n"
-        "Этот бот помогает рекрутерам управлять персоналом, а кандидатам находить работу.\n\n"
-        "<b>Кто вы?</b>"
+        "✨ <b>Добро пожаловать в Nexus AI!</b> ✨\n\n"
+        "Мы создаем идеальную среду для взаимодействия между рекрутерами и персоналом.\n\n"
+        "🚀 <b>Наши возможности:</b>\n"
+        "• Мгновенный поиск персонала на мероприятия\n"
+        "• Удобный онбординг и управление сменами\n"
+        "• Автоматизация отчетов и логов\n\n"
+        "🛡 Пожалуйста, <b>выберите вашу роль</b> для начала работы:"
     )
     await update.message.reply_html(text, reply_markup=get_role_selection_keyboard())
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """/help — Справочная информация."""
+    """/help — Справочная информация (Premium UI)."""
     user = update.effective_user
     
     # Владелец
     if user.id == settings.super_admin_id:
         text = (
-            "👑 <b>Справка владельца:</b>\n\n"
-            "/owner — Панель управления компаниями\n"
-            "/list_events — Все мероприятия (просмотр)\n"
+            "👑 <b>Панель Владельца</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "🔹 /owner — Управление компаниями и подписками\n"
+            "🔹 /list_events — Мониторинг всех мероприятий\n"
+            "🔹 /logs — Системные логи\n\n"
+            "<i>Вы имеете неограниченный доступ ко всем функциям платформы.</i>"
         )
         await update.message.reply_html(text)
         return
@@ -89,20 +104,30 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Рекрутер
     if await recruiter_service.is_recruiter(user.id):
         text = (
-            "👨‍💼 <b>Команды рекрутера:</b>\n\n"
-            "/create_event — Создать мероприятие\n"
-            "/list_events — Управление мероприятиями\n"
-            "/announce &lt;event_id&gt; &lt;текст&gt; — Рассылка\n"
-            "/export_excel &lt;event_id&gt; — Выгрузка в Excel\n"
+            "👨‍💼 <b>Инструменты Рекрутера</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "🔹 /events — <b>Ваш Дашборд</b> (Создание и управление)\n"
+            "🔹 /create_event — Быстрый запуск мероприятия\n"
+            "🔹 /list_events — Активные проекты\n\n"
+            "📢 <b>Рассылки и Экспорт:</b>\n"
+            "• <code>/announce [ID] [текст]</code> — Сообщение кандидатам\n"
+            "• <code>/export_excel [ID]</code> — Скачать отчет\n\n"
+            "💡 <i>Используйте интерактивное меню в /events для удобного управления.</i>"
         )
         await update.message.reply_html(text)
         return
 
     # Кандидат
     text = (
-        "🙋‍♂️ <b>Справка кандидата:</b>\n\n"
-        "Просто отвечайте на опросы в рабочих группах.\n"
-        "Если вам придет приглашение — подтвердите его кнопкой.\n"
-        "Чтобы изменить данные — просто напишите боту свой номер или отправьте контакт."
+        "🙋‍♂️ <b>Личный кабинет Кандидата</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "👋 Рады видеть вас в нашей базе персонала!\n\n"
+        "📍 <b>Как это работает:</b>\n"
+        "1. Следите за опросами в рабочих группах.\n"
+        "2. Жмите <b>«Участвовать»</b> и проходите короткую регистрацию.\n"
+        "3. В день мероприятия жмите <b>«Я на месте»</b> в боте.\n\n"
+        "📱 <b>Личные данные:</b>\n"
+        "Чтобы обновить контакт или ФИО, просто отправьте сообщение боту.\n\n"
+        "✨ <i>Желаем продуктивной работы!</i>"
     )
     await update.message.reply_html(text)
