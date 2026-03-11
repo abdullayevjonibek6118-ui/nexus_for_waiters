@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 from config import settings
 from models.event import Event
-from services import event_service, audit_service
+from services import event_service, audit_service, recruiter_service
 from utils.keyboards import get_event_keyboard
 from utils.validators import validate_date_format, validate_max_candidates
 
@@ -23,15 +23,19 @@ logger = logging.getLogger(__name__)
 TITLE, DATE, LOCATION, MAX_CANDIDATES, REQUIRED_MEN, REQUIRED_WOMEN = range(6)
 
 
-def is_admin(user_id: int) -> bool:
-    return user_id in settings.admin_ids
+async def is_recruiter(user_id: int) -> bool:
+    """Проверка, является ли пользователь рекрутером или владельцем."""
+    if user_id == settings.super_admin_id:
+        return True
+    return await recruiter_service.is_recruiter(user_id)
 
 
 # ─── /create_event ──────────────────────────────────────────────────────────
 
 async def create_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Начало диалога создания мероприятия."""
-    if not is_admin(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not await is_recruiter(user_id):
         await update.message.reply_text("⛔ У вас нет прав для этой команды.")
         return ConversationHandler.END
 
@@ -125,8 +129,18 @@ async def event_required_women(update: Update, context: ContextTypes.DEFAULT_TYP
     max_c = context.user_data["event_max"]
     user = update.effective_user
 
+    # Получаем ID компании рекрутера
+    rec_profile = await recruiter_service.get_recruiter(user.id)
+    if not rec_profile:
+        # Если это владелец, он может создавать мероприятия без компании (или привязать к тестовой), 
+        # но обычно мероприятия создают рекрутеры компаний.
+        company_id = None
+    else:
+        company_id = rec_profile["company_id"]
+
     event = Event(
         title=context.user_data["event_title"],
+        company_id=company_id,
         date=context.user_data["event_date"],
         location=context.user_data["event_location"],
         max_candidates=max_c,
@@ -173,11 +187,16 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показать список активных мероприятий."""
-    if not is_admin(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not await is_recruiter(user_id):
         await update.message.reply_text("⛔ У вас нет прав для этой команды.")
         return
 
-    events = await event_service.get_active_events()
+    # Получаем компанию рекрутера
+    rec_profile = await recruiter_service.get_recruiter(user_id)
+    company_id = rec_profile["company_id"] if rec_profile else None
+
+    events = await event_service.get_active_events(company_id=company_id)
     if not events:
         await update.message.reply_text("📭 Нет активных мероприятий.")
         return

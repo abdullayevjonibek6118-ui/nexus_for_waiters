@@ -7,20 +7,23 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from config import settings
 from models.event import EventStatus
-from services import event_service, candidate_service, audit_service
+from services import event_service, candidate_service, audit_service, recruiter_service
 from utils.keyboards import get_candidate_select_keyboard, get_confirm_keyboard
 from utils.validators import validate_time_format
 
 logger = logging.getLogger(__name__)
 
 
-def is_admin(user_id: int) -> bool:
-    return user_id in settings.admin_ids
+async def is_recruiter(user_id: int) -> bool:
+    """Проверка прав: Владелец или Рекрутер."""
+    if user_id == settings.super_admin_id:
+        return True
+    return await recruiter_service.is_recruiter(user_id)
 
 
 async def list_voters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/voters <event_id> — Список всех проголосовавших."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -49,7 +52,7 @@ async def list_voters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def select_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/select_candidates <event_id> — Интерактивный выбор кандидатов."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -126,7 +129,7 @@ async def set_times_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     Показывает выбранных кандидатов и просит указать времена.
     Формат: /set_times <event_id> <user_id> <HH:MM> <HH:MM>
     """
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -178,7 +181,7 @@ async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TY
     /notify_candidates <event_id>
     Отправляет приватные сообщения выбранным кандидатам с деталями мероприятия.
     """
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:

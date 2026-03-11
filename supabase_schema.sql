@@ -3,9 +3,31 @@
 -- Выполни этот скрипт в Supabase SQL Editor
 -- ============================================================
 
+-- ─── Таблица компаний (SaaS) ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS companies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    name TEXT NOT NULL,
+    subscription_until TIMESTAMPTZ,
+    monthly_fee NUMERIC DEFAULT 0,
+    group_chat_id BIGINT, -- ID группы для опросов
+    status TEXT DEFAULT 'active', -- active, expired, disabled
+    created_at TIMESTAMPTZ DEFAULT now ()
+);
+
+-- ─── Таблица рекрутеров ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS recruiters (
+    user_id BIGINT PRIMARY KEY, -- Telegram user_id
+    company_id UUID REFERENCES companies (id) ON DELETE CASCADE,
+    first_name TEXT,
+    last_name TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT now ()
+);
+
 -- ─── Таблица мероприятий ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS events (
     event_id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    company_id UUID REFERENCES companies (id) ON DELETE CASCADE, -- Привязка к компании
     title TEXT NOT NULL,
     date DATE NOT NULL,
     location TEXT NOT NULL,
@@ -89,3 +111,7 @@ CREATE POLICY "service_role_all_cands" ON candidates FOR ALL USING (true);
 CREATE POLICY "service_role_all_ec" ON event_candidates FOR ALL USING (true);
 
 CREATE POLICY "service_role_all_logs" ON event_logs FOR ALL USING (true);
+
+CREATE POLICY "service_role_all_companies" ON companies FOR ALL USING (true);
+
+CREATE POLICY "service_role_all_recruiters" ON recruiters FOR ALL USING (true);

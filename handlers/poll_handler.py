@@ -7,21 +7,22 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from config import settings
 from models.candidate import VoteStatus
-from services import event_service, candidate_service, audit_service
+from services import event_service, candidate_service, audit_service, recruiter_service
 
 logger = logging.getLogger(__name__)
 
-
-def is_admin(user_id: int) -> bool:
-    return user_id in settings.admin_ids
-
+async def is_recruiter(user_id: int) -> bool:
+    """Проверка прав: Владелец или Рекрутер."""
+    if user_id == settings.super_admin_id:
+        return True
+    return await recruiter_service.is_recruiter(user_id)
 
 async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     /publish_poll <event_id>
     Публикует опрос в групповой чат.
     """
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
 
@@ -48,10 +49,19 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     ]
 
     try:
-        group_chat_id = settings.group_chat_id
-        if group_chat_id == 0:
+        # Получаем компанию рекрутера
+        rec_profile = await recruiter_service.get_recruiter(update.effective_user.id)
+        group_chat_id = None
+        if rec_profile and rec_profile.get("companies"):
+            group_chat_id = rec_profile["companies"].get("group_chat_id")
+        
+        # Если не нашли в компании, пробуем из настроек (как fallback)
+        if not group_chat_id:
+            group_chat_id = settings.group_chat_id
+
+        if not group_chat_id or group_chat_id == 0:
             await update.effective_message.reply_text(
-                "⚠️ GROUP_CHAT_ID не задан в .env! Укажи ID группового чата."
+                "⚠️ ID группы для опросов не найден! Укажите его в панели управления компанией."
             )
             return
 
@@ -72,20 +82,19 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             f"✅ Опрос опубликован!\n\n"
             f"🆔 Poll ID: <code>{poll_id}</code>\n"
             f"📊 Статус мероприятия: Poll_Published\n\n"
-            f"Используйте /close_poll {event_id} чтобы закрыть опрос."
+            f"Используйте /close_poll {event_id} чтобы закрывать опрос."
         )
 
     except Exception as e:
         logger.error(f"Ошибка публикации опроса: {e}")
         await update.effective_message.reply_text(f"❌ Ошибка публикации опроса: {e}")
 
-
 async def close_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     /close_poll <event_id>
     Закрывает опрос и переводит мероприятие в Selection_Completed.
     """
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
 
@@ -111,7 +120,6 @@ async def close_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"или /select_candidates {event_id} чтобы отобрать кандидатов."
     )
     await update.effective_message.reply_html(text)
-
 
 async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """

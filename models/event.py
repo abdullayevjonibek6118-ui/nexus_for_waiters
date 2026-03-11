@@ -20,6 +20,7 @@ class EventStatus(str, Enum):
 
 class Event(BaseModel):
     event_id: Optional[str] = None
+    company_id: Optional[str] = None
     title: str
     date: str                          # ISO date string: YYYY-MM-DD
     location: str

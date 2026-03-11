@@ -88,3 +88,10 @@ def get_events_list_keyboard(events: list) -> InlineKeyboardMarkup:
         btn_text = f"📅 {ev.date} | {ev.title}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"manage:{ev.event_id}")])
     return InlineKeyboardMarkup(keyboard)
+def get_role_selection_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора роли при регистрации."""
+    keyboard = [
+        [InlineKeyboardButton("👨‍💼 Я Рекрутер (Company Admin)", callback_data="role:recruiter")],
+        [InlineKeyboardButton("🙋‍♂️ Я Кандидат (Waiter)", callback_data="role:candidate")],
+    ]
+    return InlineKeyboardMarkup(keyboard)

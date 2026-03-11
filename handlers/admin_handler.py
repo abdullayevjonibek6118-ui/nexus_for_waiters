@@ -10,18 +10,21 @@ from telegram.ext import ContextTypes, ApplicationBuilder
 from telegram.constants import ParseMode
 from config import settings
 from models.event import EventStatus
-from services import event_service, candidate_service, audit_service, sheets_service, scheduler_service, excel_service
+from services import event_service, candidate_service, audit_service, sheets_service, scheduler_service, excel_service, recruiter_service
 
 logger = logging.getLogger(__name__)
 
 
-def is_admin(user_id: int) -> bool:
-    return user_id in settings.admin_ids
+async def is_recruiter(user_id: int) -> bool:
+    """Проверка прав: Владелец или Рекрутер."""
+    if user_id == settings.super_admin_id:
+        return True
+    return await recruiter_service.is_recruiter(user_id)
 
 
 async def create_sheet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/create_sheet <event_id> — Создать Google Sheet для мероприятия."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -64,7 +67,7 @@ async def create_sheet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def payment_reminder_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/payment_reminder <event_id> — Запланировать напоминание об оплате."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -100,7 +103,7 @@ async def payment_reminder_cmd(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def payment_confirmed_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/payment_confirmed <event_id> — Отменить напоминание (оплата получена)."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -124,7 +127,7 @@ async def payment_confirmed_cmd(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/logs <event_id> — Просмотр аудит-лога мероприятия."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -149,7 +152,7 @@ async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def close_event_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/close_event <event_id> — Закрыть/архивировать мероприятие."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -173,7 +176,7 @@ async def close_event_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/export_excel <event_id> — Выгрузить данные в XLSX."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if not context.args:
@@ -229,7 +232,7 @@ async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def announce_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/announce <event_id> <сообщение> — Массовая рассылка сообщений."""
-    if not is_admin(update.effective_user.id):
+    if not await is_recruiter(update.effective_user.id):
         await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
     if len(context.args) < 2:

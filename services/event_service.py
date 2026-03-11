@@ -18,6 +18,7 @@ async def create_event(event: Event) -> Optional[Event]:
         event_id = str(uuid.uuid4())
         data = {
             "event_id": event_id,
+            "company_id": event.company_id,
             "title": event.title,
             "date": event.date,
             "location": event.location,
@@ -50,18 +51,21 @@ async def get_event(event_id: str) -> Optional[Event]:
         return None
 
 
-async def get_active_events() -> List[Event]:
-    """Получить список незакрытых мероприятий."""
+async def get_active_events(company_id: Optional[str] = None) -> List[Event]:
+    """Получить список незакрытых мероприятий (опционально по компании)."""
     try:
         db = get_db()
-        result = (
+        query = (
             db.table("events")
             .select("*")
             .neq("status", EventStatus.CLOSED.value)
             .neq("status", EventStatus.COMPLETED.value)
-            .order("date")
-            .execute()
         )
+        
+        if company_id:
+            query = query.eq("company_id", company_id)
+            
+        result = query.order("date").execute()
         return [Event(**row) for row in (result.data or [])]
     except Exception as e:
         logger.error(f"Ошибка получения мероприятий: {e}")

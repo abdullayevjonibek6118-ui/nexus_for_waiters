@@ -37,6 +37,8 @@ from handlers.admin_handler import (
     export_excel_cmd,
     announce_cmd,
 )
+from handlers.super_admin_handler import owner_cmd, get_super_admin_handler, sa_callback_handler
+from handlers.role_handler import handle_role_callback
 
 # Планировщик (инициализация)
 from services.scheduler_service import get_scheduler, get_scheduler_async
@@ -106,6 +108,10 @@ def main() -> None:
     app.add_handler(CommandHandler("logs", logs_cmd))
     app.add_handler(CommandHandler("export_excel", export_excel_cmd))
     app.add_handler(CommandHandler("announce", announce_cmd))
+    
+    # ── Владелец (SaaS) ──────────────────────────────────────────────────────
+    app.add_handler(CommandHandler("owner", owner_cmd))
+    app.add_handler(get_super_admin_handler()) # ConversationHandler для создания компаний
 
     # ── Callback-кнопки ─────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(handle_toggle_select,        pattern=r"^toggle_select:"))
@@ -116,6 +122,8 @@ def main() -> None:
         pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel):"
     ))
     app.add_handler(CallbackQueryHandler(handle_set_gender, pattern=r"^set_gender:"))
+    app.add_handler(CallbackQueryHandler(handle_role_callback, pattern=r"^role:"))
+    app.add_handler(CallbackQueryHandler(sa_callback_handler, pattern=r"^sa:"))
 
     # ── Неизвестные команды ──────────────────────────────────────────────────
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))

@@ -17,7 +17,8 @@ class Settings(BaseSettings):
 
     # Telegram
     bot_token: str
-    admin_user_ids: str = ""          # строка вида "111,222,333"
+    super_admin_id: int               # Telegram ID владельца платформы
+    admin_user_ids: str = ""          # строка вида "111,222,333" (устаревает, но оставим для совместимости)
     group_chat_id: int = 0
 
     # Supabase

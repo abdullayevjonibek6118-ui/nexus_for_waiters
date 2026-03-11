@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.triggers.cron import CronTrigger
 from config import settings
-from services import event_service, candidate_service
+from services import event_service, candidate_service, company_service
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,12 @@ async def schedule_daily_reminders(bot):
         # Получаем все активные мероприятия
         events = await event_service.get_active_events()
         for ev in events:
+            # Проверка подписки компании перед отправкой напоминаний
+            if ev.company_id:
+                if not await company_service.check_subscription(ev.company_id):
+                    logger.warning(f"Пропуск напоминаний для {ev.title}: подписка компании истекла.")
+                    continue
+
             if ev.date == tomorrow:
                 # Нашли мероприятие на завтра, берём подтвержденных кандидатов
                 selected = await candidate_service.get_selected_candidates(ev.event_id)
