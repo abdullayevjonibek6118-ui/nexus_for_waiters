@@ -16,7 +16,7 @@ from utils.keyboards import (
 logger = logging.getLogger(__name__)
 
 # Состояния
-WAIT_REG_START, INPUT_NAME, CHOOSE_ROLE, SHARE_PHONE, CHOOSE_TIME, CONFIRM_DATA = range(6)
+WAIT_REG_START, CHOOSE_ROLE, SHARE_PHONE, INPUT_NAME, CHOOSE_GENDER, CHOOSE_TIME, CONFIRM_DATA = range(7)
 
 async def start_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str):
     """Начало онбординга (Этап 2)."""
@@ -76,17 +76,37 @@ async def handle_phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return INPUT_NAME
 
 async def handle_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Шаг 4: Время."""
+    """Шаг 4: Пол."""
     name = update.message.text.strip()
     context.user_data["ob_full_name"] = name
+    
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = [[
+        InlineKeyboardButton("👨 Мужской", callback_data="ob_gender:Male"),
+        InlineKeyboardButton("👩 Женский", callback_data="ob_gender:Female")
+    ]]
+    await update.message.reply_html(
+        "🚻 <b>Шаг 4 из 5: Ваш пол</b>\n\nПожалуйста, выберите ваш пол:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return CHOOSE_GENDER
+
+async def handle_gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Шаг 5: Время."""
+    query = update.callback_query
+    await query.answer()
+    
+    gender = query.data.split(":")[1]
+    context.user_data["ob_gender"] = gender
     
     event_id = context.user_data.get("ob_event_id")
     event = await event_service.get_event(event_id)
     times = event.arrival_times or ["08:00", "09:00", "10:00"]
     
-    await update.message.reply_html(
-        f"⏰ <b>Шаг 4 из 4: Время прихода</b>\n\nВыберите удобное время начала смены:",
-        reply_markup=get_dynamic_choice_keyboard(times, "ob_time")
+    await query.edit_message_text(
+        f"⏰ <b>Шаг 5 из 5: Время прихода</b>\n\nВыберите удобное время начала смены:",
+        reply_markup=get_dynamic_choice_keyboard(times, "ob_time"),
+        parse_mode="HTML"
     )
     return CHOOSE_TIME
 
@@ -131,6 +151,7 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_name = context.user_data.get("ob_full_name")
     role = context.user_data.get("ob_role")
     phone = context.user_data.get("ob_phone")
+    gender = context.user_data.get("ob_gender")
     
     # BUG-05: Создаём профиль перед регистрацией (Foreign Key Guard)
     await candidate_service.get_or_create_candidate(user_id, user.first_name, user.last_name, user.username)
@@ -138,6 +159,7 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Сохраняем данные
     await candidate_service.update_candidate_full_name(user_id, full_name)
     await candidate_service.update_phone_number(user_id, phone)
+    await candidate_service.update_candidate_gender(user_id, gender) # Сохраняем пол
     await candidate_service.update_candidate_role(user_id, role)  # BUG-06: явно сохраняем роль
     await candidate_service.register_for_event(event_id, user_id, role, context.user_data.get("ob_time"))
     
@@ -184,14 +206,16 @@ def get_onboarding_handler():
             CallbackQueryHandler(handle_ob_start, pattern="^ob_start:")
         ],
         states={
-            INPUT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input)],
-            CHOOSE_ROLE: [CallbackQueryHandler(handle_role_choice, pattern="^ob_role:")],
+            WAIT_REG_START: [CallbackQueryHandler(handle_ob_start, pattern=r"^ob_start:")],
+            CHOOSE_ROLE: [CallbackQueryHandler(handle_role_choice, pattern=r"^ob_role:")],
             SHARE_PHONE: [MessageHandler(filters.CONTACT, handle_phone_input)],
-            CHOOSE_TIME: [CallbackQueryHandler(handle_time_choice, pattern="^ob_time:")],
+            INPUT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input)],
+            CHOOSE_GENDER: [CallbackQueryHandler(handle_gender_choice, pattern=r"^ob_gender:")],
+            CHOOSE_TIME: [CallbackQueryHandler(handle_time_choice, pattern=r"^ob_time:")],
             CONFIRM_DATA: [
-                CallbackQueryHandler(handle_ob_confirm, pattern="^ob_confirm:"),
-                CallbackQueryHandler(handle_ob_edit, pattern="^ob_edit:")
-            ],
+                CallbackQueryHandler(handle_ob_confirm, pattern=r"^ob_confirm:"),
+                CallbackQueryHandler(handle_ob_edit, pattern=r"^ob_edit:")
+            ]
         },
         fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
         allow_reentry=True,

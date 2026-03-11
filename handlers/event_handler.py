@@ -21,7 +21,7 @@ from utils.validators import validate_date_format, validate_max_candidates
 logger = logging.getLogger(__name__)
 
 # Состояния ConversationHandler
-E_TITLE, E_DATE, E_LOC, E_PAYMENT, E_MAX, E_ROLES, E_TIMES = range(7)
+E_TITLE, E_DATE, E_LOC, E_PAYMENT, E_MAX, E_GENDERS, E_ROLES, E_TIMES = range(8)
 
 
 
@@ -126,7 +126,7 @@ async def create_event_start_cmd(update: Update, context: ContextTypes.DEFAULT_T
         send = update.message.reply_html
 
     await send(
-        "📝 <b>Шаг 1 из 7: Название</b>\n\nВведите название мероприятия:",
+        "📝 <b>Шаг 1 из 8: Название</b>\n\nВведите название мероприятия:",
         parse_mode="HTML"
     )
     return E_TITLE
@@ -134,7 +134,7 @@ async def create_event_start_cmd(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_ev_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["ev_name"] = update.message.text.strip()
     await update.message.reply_html(
-        "📅 <b>Шаг 2 из 7: Дата</b>\n\n"
+        "📅 <b>Шаг 2 из 8: Дата</b>\n\n"
         "Введите дату мероприятия.\n"
         "<i>Примеры: <code>15 апреля</code>, <code>15 апреля 2026</code>, <code>15.04.2026</code></i>"
     )
@@ -153,12 +153,12 @@ async def handle_ev_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return E_DATE
     context.user_data["ev_date"] = iso_date
-    await update.message.reply_html("📍 <b>Шаг 3 из 7: Место проведения</b>\n\nУкажите точный адрес или заведение:")
+    await update.message.reply_html("📍 <b>Шаг 3 из 8: Место проведения</b>\n\nУкажите точный адрес или заведение:")
     return E_LOC
 
 async def handle_ev_loc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["ev_loc"] = update.message.text.strip()
-    await update.message.reply_html("💰 <b>Шаг 4 из 7: Оплата</b>\n\nУкажите сумму оплаты (например: 4000 или 350-400/час):")
+    await update.message.reply_html("💰 <b>Шаг 4 из 8: Оплата</b>\n\nУкажите сумму оплаты (например: 4000 или 350-400/час):")
     return E_PAYMENT
 
 async def handle_ev_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -167,7 +167,7 @@ async def handle_ev_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if "₽" not in payment_raw and "руб" not in payment_raw.lower():
         payment_raw = f"{payment_raw} ₽"
     context.user_data["ev_payment"] = payment_raw
-    await update.message.reply_html("👥 <b>Шаг 5 из 7: Количество сотрудников</b>\n\nСколько человек нужно на мероприятие?")
+    await update.message.reply_html("👥 <b>Шаг 5 из 8: Количество сотрудников</b>\n\nСколько всего человек нужно на мероприятие?")
     return E_MAX
 
 async def handle_ev_max(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -178,13 +178,35 @@ async def handle_ev_max(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         return E_MAX
     
     context.user_data["ev_max"] = max_c
-    await update.message.reply_html("🎭 <b>Шаг 6 из 7: Роли</b>\n\nКакие роли нужны? (через запятую)\n<i>Пример: Промоутер, Хостес, Регистратор</i>")
+    await update.message.reply_html(
+        "🚻 <b>Шаг 6 из 8: Требования к полу</b>\n\n"
+        "Сколько нужно парней и девушек?\n"
+        "<i>Например: <code>М-5 Ж-5</code> или введите <code>0</code> если пол не важен.</i>"
+    )
+    return E_GENDERS
+
+async def handle_ev_genders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text.strip().lower()
+    men = 0
+    women = 0
+    
+    if text != "0":
+        import re
+        men_match = re.search(r'м[ -]?(\d+)', text)
+        women_match = re.search(r'ж[ -]?(\d+)', text)
+        if men_match: men = int(men_match.group(1))
+        if women_match: women = int(women_match.group(1))
+        
+    context.user_data["ev_men"] = men
+    context.user_data["ev_women"] = women
+
+    await update.message.reply_html("🎭 <b>Шаг 7 из 8: Роли</b>\n\nКакие роли нужны? (через запятую)\n<i>Пример: Промоутер, Хостес, Регистратор</i>")
     return E_ROLES
 
 async def handle_ev_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     roles = [r.strip() for r in update.message.text.split(",")]
     context.user_data["ev_roles"] = roles
-    await update.message.reply_html("⏰ <b>Шаг 7 из 7: Времена прихода</b>\n\nВведите доступные времена через запятую:\n<i>Пример: 08:00, 09:00, 10:00</i>")
+    await update.message.reply_html("⏰ <b>Шаг 8 из 8: Времена прихода</b>\n\nВведите доступные времена через запятую:\n<i>Пример: 08:00, 09:00, 10:00</i>")
     return E_TIMES
 
 async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -203,6 +225,8 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         max_candidates=context.user_data["ev_max"],
         required_roles=context.user_data["ev_roles"],
         arrival_times=context.user_data["ev_times"],
+        required_men=context.user_data.get("ev_men", 0),
+        required_women=context.user_data.get("ev_women", 0),
         company_id=company_id,
         created_by=user.id
     )
@@ -212,6 +236,11 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         from utils.keyboards import get_event_post_creation_keyboard
         roles_str = ", ".join(context.user_data["ev_roles"])
         times_str = ", ".join(context.user_data["ev_times"])
+        
+        gender_req = ""
+        if saved.required_men > 0 or saved.required_women > 0:
+            gender_req = f"\n🚻 <b>Пол:</b> М-{saved.required_men} Ж-{saved.required_women}"
+
         text = (
             "✅ <b>Мероприятие создано!</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -219,7 +248,7 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"📅 <b>Дата:</b> {saved.date}\n"
             f"📍 <b>Адрес:</b> {saved.location}\n"
             f"💰 <b>Оплата:</b> {saved.payment}\n"
-            f"👥 <b>Лимит:</b> {saved.max_candidates} чел.\n"
+            f"👥 <b>Лимит:</b> {saved.max_candidates} чел.{gender_req}\n"
             f"🎭 <b>Роли:</b> {roles_str}\n"
             f"⏰ <b>Времена:</b> {times_str}\n\n"
             "<i>Что делаем дальше?</i>"
@@ -289,6 +318,7 @@ def get_create_event_handler() -> ConversationHandler:
             E_LOC: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_loc)],
             E_PAYMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_payment)],
             E_MAX: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_max)],
+            E_GENDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_genders)],
             E_ROLES: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_roles)],
             E_TIMES: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_times)],
         },

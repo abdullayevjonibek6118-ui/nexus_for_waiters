@@ -55,6 +55,17 @@ async def update_phone_number(user_id: int, phone: str) -> bool:
         return False
 
 
+async def update_candidate_gender(user_id: int, gender: str) -> bool:
+    """Установить пол кандидата (Male/Female)."""
+    try:
+        db = get_db()
+        db.table("candidates").update({"gender": gender}).eq("user_id", user_id).execute()
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка сохранения пола кандидата {user_id}: {e}")
+        return False
+
+
 async def save_vote(event_id: str, user_id: int, vote_status: VoteStatus) -> bool:
     """Сохранить голос кандидата за мероприятие."""
     try:

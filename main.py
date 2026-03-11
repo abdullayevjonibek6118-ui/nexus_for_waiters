@@ -123,9 +123,9 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^(confirm|inv)_(yes|no):"))
     app.add_handler(CallbackQueryHandler(
         handle_event_action_callback,
-        pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel|ev_[a-zA-Z0-9_]+|card_next)(:|$)"
+        pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel|ev_[a-zA-Z0-9_]+)(:|$)"
     ))
-    app.add_handler(CallbackQueryHandler(handle_card_callback, pattern=r"^card_(accept|reject)"))
+    app.add_handler(CallbackQueryHandler(handle_card_callback, pattern=r"^card_(accept|reject|next)"))
     app.add_handler(CallbackQueryHandler(handle_checkin, pattern=r"^checkin_"))
     app.add_handler(CallbackQueryHandler(handle_set_gender, pattern=r"^set_gender:"))
     app.add_handler(CallbackQueryHandler(handle_role_callback, pattern=r"^role:"))
