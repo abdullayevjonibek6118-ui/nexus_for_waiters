@@ -95,3 +95,21 @@ def get_role_selection_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🙋‍♂️ Я Кандидат (Waiter)", callback_data="role:candidate")],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+def get_set_times_keyboard(selected_candidates: list, event_id: str) -> InlineKeyboardMarkup:
+    """Клавиатура для упрощенного назначения времени."""
+    keyboard = []
+    
+    # Кнопка для всех
+    keyboard.append([InlineKeyboardButton("✨ Назначить всем одинаковое время", callback_data=f"st_all:{event_id}")])
+    
+    # Кнопки для каждого индивидуально
+    for c in selected_candidates:
+        p = c.get("candidates", {}) or {}
+        name = f"{p.get('first_name','?')} {p.get('last_name','')}".strip()
+        uid = c.get("user_id")
+        keyboard.append([InlineKeyboardButton(f"👤 {name} (ID: {uid})", callback_data=f"st_one:{event_id}:{uid}")])
+    
+    keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data=f"manage:{event_id}")])
+    return InlineKeyboardMarkup(keyboard)

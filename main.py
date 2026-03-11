@@ -27,6 +27,8 @@ from handlers.candidate_handler import (
     handle_candidate_confirmation,
     handle_contact,
     handle_set_gender,
+    handle_set_time_callback,
+    handle_time_message_input,
 )
 from handlers.admin_handler import (
     create_sheet_cmd,
@@ -124,8 +126,10 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(handle_set_gender, pattern=r"^set_gender:"))
     app.add_handler(CallbackQueryHandler(handle_role_callback, pattern=r"^role:"))
     app.add_handler(CallbackQueryHandler(sa_callback_handler, pattern=r"^sa:"))
+    app.add_handler(CallbackQueryHandler(handle_set_time_callback, pattern=r"^st_(all|one):"))
 
     # ── Неизвестные команды ──────────────────────────────────────────────────
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_time_message_input))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(
         filters.COMMAND,

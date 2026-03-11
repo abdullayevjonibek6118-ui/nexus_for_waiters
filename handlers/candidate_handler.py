@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 from config import settings
 from models.event import EventStatus
 from services import event_service, candidate_service, audit_service, recruiter_service
-from utils.keyboards import get_candidate_select_keyboard, get_confirm_keyboard
+from utils.keyboards import get_candidate_select_keyboard, get_confirm_keyboard, get_set_times_keyboard
 from utils.validators import validate_time_format
 
 logger = logging.getLogger(__name__)
@@ -161,19 +161,80 @@ async def set_times_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     text = (
         f"⏰ <b>Назначение времени для мероприятия</b>\n\n"
-        f"Для каждого кандидата отправьте:\n"
-        f"<code>/set_times {event_id} &lt;user_id&gt; &lt;HH:MM&gt; &lt;HH:MM&gt;</code>\n\n"
-        f"<b>Выбранные кандидаты:</b>\n"
+        f"Выберите кандидата, чтобы назначить ему время,\n"
+        f"или нажмите «Назначить всем одинаковое время».\n\n"
+        f"<b>Текущие времена:</b>\n"
     )
     for c in selected:
         p = c.get("candidates", {}) or {}
         name = f"{p.get('first_name','?')} {p.get('last_name','')}".strip()
-        uid = c.get("user_id")
         arrival = c.get("arrival_time", "—")
         departure = c.get("departure_time", "—")
-        text += f"\n👤 {name} | ID: <code>{uid}</code>\n   🟢 {arrival} → 🔴 {departure}\n"
+        text += f"👤 {name}: 🟢 {arrival} → 🔴 {departure}\n"
 
-    await update.effective_message.reply_html(text)
+    await update.effective_message.reply_html(
+        text,
+        reply_markup=get_set_times_keyboard(selected, event_id)
+    )
+
+
+async def handle_set_time_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработка кнопок выбора кандидата для времени."""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data.split(":")
+    action = data[0] # st_all or st_one
+    event_id = data[1]
+    
+    if action == "st_all":
+        context.user_data["st_state"] = {"event_id": event_id, "mode": "all"}
+        await query.edit_message_text(
+            "⏳ Введите время для <b>всех</b> кандидатов в формате:\n<code>HH:MM HH:MM</code>\n\nПример: <code>09:00 20:00</code>",
+            parse_mode="HTML"
+        )
+    elif action == "st_one":
+        user_id = int(data[2])
+        context.user_data["st_state"] = {"event_id": event_id, "mode": "one", "user_id": user_id}
+        await query.edit_message_text(
+            f"⏳ Введите время для кандидата (ID: {user_id}) в формате:\n<code>HH:MM HH:MM</code>",
+            parse_mode="HTML"
+        )
+
+
+async def handle_time_message_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработка текстового ввода времени после нажатия кнопок."""
+    state = context.user_data.get("st_state")
+    if not state:
+        return # Не в состоянии ожидания времени - игнорируем
+    
+    text = update.message.text.strip()
+    parts = text.split()
+    if len(parts) != 2:
+        await update.message.reply_text("❌ Ошибка. Введите два значения времени через пробел: HH:MM HH:MM")
+        return
+        
+    arrival, departure = parts
+    if not validate_time_format(arrival) or not validate_time_format(departure):
+        await update.message.reply_text("❌ Неверный формат. Используйте HH:MM HH:MM (например, 09:00 18:00)")
+        return
+        
+    event_id = state["event_id"]
+    
+    if state["mode"] == "all":
+        selected = await candidate_service.get_selected_candidates(event_id)
+        for c in selected:
+            await candidate_service.set_arrival_departure(event_id, c["user_id"], arrival, departure)
+        await update.message.reply_html(f"✅ Время <b>{arrival} – {departure}</b> назначено <b>всем</b> кандидатам!")
+    
+    elif state["mode"] == "one":
+        user_id = state["user_id"]
+        await candidate_service.set_arrival_departure(event_id, user_id, arrival, departure)
+        await update.message.reply_html(f"✅ Время <b>{arrival} – {departure}</b> назначено для ID <code>{user_id}</code>")
+
+    # Очищаем состояние и предлагаем вернуться к списку
+    context.user_data.pop("st_state")
+    await set_times_cmd(update, context) # Повторно вызываем команду, чтобы показать обновленный список
 
 
 async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
