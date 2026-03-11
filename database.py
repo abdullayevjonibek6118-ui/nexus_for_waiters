@@ -14,3 +14,6 @@ def get_db() -> Client:
     if _client is None:
         _client = create_client(settings.supabase_url, settings.supabase_key)
     return _client
+
+
+supabase = get_db()

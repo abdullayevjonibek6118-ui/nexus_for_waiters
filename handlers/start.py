@@ -92,8 +92,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "👨‍💼 <b>Команды рекрутера:</b>\n\n"
             "/create_event — Создать мероприятие\n"
             "/list_events — Управление мероприятиями\n"
-            "/announce <event_id> <текст> — Рассылка\n"
-            "/export_excel <event_id> — Выгрузка в Excel\n"
+            "/announce &lt;event_id&gt; &lt;текст&gt; — Рассылка\n"
+            "/export_excel &lt;event_id&gt; — Выгрузка в Excel\n"
         )
         await update.message.reply_html(text)
         return
