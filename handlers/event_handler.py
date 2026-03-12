@@ -118,12 +118,11 @@ async def create_event_start_cmd(update: Update, context: ContextTypes.DEFAULT_T
     """Команда /create_event или нажатие кнопки."""
     if update.callback_query:
         await update.callback_query.answer()
-        message = update.callback_query.message
-        send = message.reply_text
+        send = update.callback_query.message.reply_text
     else:
         if not await is_recruiter(update.effective_user.id):
             return ConversationHandler.END
-        send = update.message.reply_html
+        send = update.message.reply_text  # используем reply_text везде
 
     await send(
         "📝 <b>Шаг 1 из 8: Название</b>\n\nВведите название мероприятия:",
@@ -255,7 +254,7 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         await update.message.reply_html(
             text,
-            reply_markup=get_event_post_creation_keyboard(saved.event_id)
+            reply_markup=get_event_post_creation_keyboard()
         )
     else:
         await update.message.reply_text("❌ Ошибка при создании мероприятия. Попробуйте снова.")
@@ -266,42 +265,147 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ─── /list_events ────────────────────────────────────────────────────────────
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показать список активных мероприятий. Работает из команды /list_events и из кнопки ev_active."""
-    query = update.callback_query
+    """Показать список активных мероприятий как Reply-кнопки."""
     user_id = update.effective_user.id
 
     if not await is_recruiter(user_id):
-        if query:
-            await query.answer("⛔ Нет прав", show_alert=True)
-        else:
-            await update.message.reply_text("⛔ У вас нет прав для этой команды.")
+        await update.effective_message.reply_text("⛔ У вас нет прав.")
         return
 
     rec_profile = await recruiter_service.get_recruiter(user_id)
     company_id = rec_profile["company_id"] if rec_profile else None
-
     events = await event_service.get_active_events(company_id=company_id)
     
     if not events:
-        text = "📭 <b>У вас пока нет активных мероприятий.</b>\n\nНажмите «Создать мероприятие», чтобы начать."
-        from utils.keyboards import get_recruiter_dashboard_keyboard
-        if query:
-            await query.edit_message_text(text, parse_mode="HTML", reply_markup=get_recruiter_dashboard_keyboard())
-        else:
-            await update.message.reply_html(text)
+        await update.effective_message.reply_html("📭 <b>У вас пока нет активных мероприятий.</b>")
         return
+
+    # Сохраняем список мероприятий для последующего поиска по названию на кнопке
+    context.user_data["ev_list"] = {f"📅 {ev.date} | {ev.title}": ev.event_id for ev in events}
 
     text = (
         "📅 <b>Ваши активные мероприятия</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "<i>Выберите проект для управления:</i>"
+        "<i>Выберите проект из списка ниже:</i>"
     )
-    from utils.keyboards import get_events_list_keyboard
-    markup = get_events_list_keyboard(events)
-    if query:
-        await query.edit_message_text(text, reply_markup=markup, parse_mode="HTML")
-    else:
-        await update.message.reply_html(text, reply_markup=markup)
+    from utils.keyboards import get_events_list_reply_keyboard
+    await update.effective_message.reply_html(
+        text, 
+        reply_markup=get_events_list_reply_keyboard(events)
+    )
+
+
+async def handle_recruiter_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик главного меню рекрутера (Reply-кнопки)."""
+    text = update.message.text
+    
+    if text == "🆕 Создать мероприятие":
+        # Команда /create_event теперь поймается ConversationHandler напрямую
+        # Если вдруг нет (например, стейт сбросился), вызываем стартовую логику:
+        await create_event_start_cmd(update, context)
+    elif text == "📋 Мои мероприятия":
+        await list_events(update, context)
+    elif text == "📊 Отчеты":
+        # Используем существующую логику отчетов, но адаптированную под Reply
+        user_id = update.effective_user.id
+        rec_profile = await recruiter_service.get_recruiter(user_id)
+        company_id = rec_profile.get("company_id") if rec_profile else None
+        events = await event_service.get_active_events(company_id=company_id)
+        
+        report_text = (
+            "📊 <b>Статистика и отчеты</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📅 <b>Активных проектов (мероприятий):</b> {len(events)}\n\n"
+            "<i>💡 Чтобы получить отчет, выберите мероприятие в списке и нажмите «📄 Экспорт Excel».</i>"
+        )
+        await update.message.reply_html(report_text)
+    elif text == "❓ Помощь":
+        await update.message.reply_html("ℹ️ <b>Справка:</b>\n\nИспользуйте кнопки меню для управления проектами.")
+
+
+async def handle_event_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик выбора конкретного мероприятия из списка (Reply-кнопки)."""
+    text = update.message.text
+    ev_list = context.user_data.get("ev_list", {})
+    
+    if text in ev_list:
+        event_id = ev_list[text]
+        await show_event_management_menu(update, context, event_id)
+    elif text == "⬅️ Назад в меню":
+        await events_dashboard(update, context)
+
+
+async def show_event_management_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str) -> None:
+    """Хелпер: показать меню управления мероприятием."""
+    context.user_data["selected_event_id"] = event_id
+    event = await event_service.get_event(event_id)
+    
+    if not event:
+        await update.effective_message.reply_text("❌ Мероприятие не найдено.")
+        return
+
+    from utils.keyboards import get_event_action_reply_keyboard
+    info = (
+        f"⚙️ <b>Управление: {event.title}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📅 <b>Дата:</b> {event.date}\n"
+        f"📍 <b>Место:</b> {event.location}\n"
+        f"👥 <b>Лимит:</b> {event.max_candidates}\n"
+        f"📊 <b>Статус:</b> {event.status.value}\n\n"
+        "<i>Выберите действие для этого мероприятия:</i>"
+    )
+    await update.effective_message.reply_html(info, reply_markup=get_event_action_reply_keyboard(event.title))
+
+
+async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик действий внутри меню мероприятия."""
+    text = update.message.text
+    event_id = context.user_data.get("selected_event_id")
+    
+    if not event_id and text != "⬅️ К списку мероприятий":
+        return
+
+    if text == "📢 Опубликовать":
+        from handlers.poll_handler import publish_poll
+        context.args = [event_id]
+        await publish_poll(update, context)
+    
+    elif text == "👥 Карточки":
+        from handlers.candidate_handler import show_candidate_cards
+        await show_candidate_cards(update, context, event_id=event_id)
+
+    elif text == "✉️ Уведомить":
+        from handlers.candidate_handler import notify_candidates_cmd
+        context.args = [event_id]
+        await notify_candidates_cmd(update, context)
+
+    elif text == "📄 Экспорт Excel":
+        from handlers.admin_handler import export_excel_cmd
+        context.args = [event_id]
+        await export_excel_cmd(update, context)
+
+    elif text == "⏰ Назначить время":
+        from handlers.candidate_handler import set_times_cmd
+        context.args = [event_id]
+        await set_times_cmd(update, context)
+
+    elif text == "🤖 Автоотбор":
+        from handlers.candidate_handler import auto_select_cmd
+        context.args = [event_id]
+        await auto_select_cmd(update, context)
+
+    elif text == "📊 Логи":
+        from handlers.admin_handler import logs_cmd
+        context.args = [event_id]
+        await logs_cmd(update, context)
+
+    elif text == "❌ Архивировать":
+        from handlers.admin_handler import close_event_cmd
+        context.args = [event_id]
+        await close_event_cmd(update, context)
+
+    elif text == "⬅️ К списку мероприятий":
+        await list_events(update, context)
 
 
 # ─── ConversationHandler ─────────────────────────────────────────────────────
@@ -310,7 +414,8 @@ def get_create_event_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[
             CommandHandler("create_event", create_event_start_cmd),
-            CallbackQueryHandler(create_event_start_cmd, pattern="^ev_create$")
+            CallbackQueryHandler(create_event_start_cmd, pattern="^ev_create$"),
+            MessageHandler(filters.Regex(r"^🆕 Создать мероприятие$"), create_event_start_cmd)
         ],
         states={
             E_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_name)],
@@ -338,9 +443,8 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
     
     if data == "ev_create":
         # Переход в диалог создания (через ConversationHandler)
-        await query.edit_message_text("Введите название мероприятия:")
-        # Важно: здесь мы просто меняем текст, сам стейт E_TITLE должен пойматься 
-        # но лучше использовать EntryPoint
+        # Мы НЕ возвращаем стейт здесь, так как мы вне CH. 
+        # Но CallbackQueryHandler в entry_points поймает этот callback и начнет диалог.
         return
 
     if data == "ev_active":
@@ -378,7 +482,7 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
                 f"👥 Лимит: {event.max_candidates} чел.\n"
                 f"📊 Статус: {event.status.value}"
             )
-            await query.edit_message_text(text, reply_markup=get_event_post_creation_keyboard(event.event_id), parse_mode="HTML")
+            await query.message.reply_html(text, reply_markup=get_event_post_creation_keyboard())
 
     elif action == "ev_publish" or action == "poll_publish":
         from handlers.poll_handler import publish_poll

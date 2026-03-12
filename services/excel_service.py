@@ -52,10 +52,19 @@ def generate_event_xlsx(event_title: str, event_date: str, event_location: str, 
     row_idx = 3
     for c in candidates:
         profile = c.get("candidates", {}) or {}
-        first_name = profile.get("first_name", "")
-        last_name = profile.get("last_name", "")
-        full_name = sanitize_for_excel(f"{first_name} {last_name}".strip())
-        gender = sanitize_for_excel(profile.get("gender", "—"))
+        # Используем сохраненное полное имя, если оно есть
+        db_full_name = profile.get("full_name")
+        if db_full_name:
+            full_name = sanitize_for_excel(db_full_name)
+        else:
+            first_name = profile.get("first_name", "")
+            last_name = profile.get("last_name", "")
+            full_name = sanitize_for_excel(f"{first_name} {last_name}".strip())
+            
+        gender_raw = profile.get("gender", "—")
+        gender = "Мужской" if gender_raw == "Male" else "Женский" if gender_raw == "Female" else gender_raw
+        gender = sanitize_for_excel(gender)
+        
         phone = sanitize_for_excel(profile.get("phone_number", "—"))
         username = sanitize_for_excel(profile.get("telegram_username", "—"))
         arrival = c.get("arrival_time") or "—"

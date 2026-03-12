@@ -53,7 +53,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # 3. Проверяем, является ли он кандидатом
     candidate = await candidate_service.get_candidate_profile(user.id)
     if candidate:
-        if candidate.get("gender"):
+        if candidate.gender:
             text = (
                 f"👋 <b>С возвращением, {user.first_name}!</b>\n\n"
                 "Вы зарегистрированы как кандидат. Ожидайте новых опросов в группах.\n\n"

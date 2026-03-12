@@ -101,7 +101,7 @@ async def get_voters(event_id: str) -> List[dict]:
         db = get_db()
         result = (
             db.table("event_candidates")
-            .select("*, candidates(first_name, last_name, phone_number, telegram_username)")
+            .select("*, candidates(first_name, last_name, full_name, gender, phone_number, telegram_username, primary_role)")
             .eq("event_id", event_id)
             .neq("vote_status", VoteStatus.NO.value)
             .execute()
@@ -163,7 +163,7 @@ async def get_selected_candidates(event_id: str) -> List[dict]:
         db = get_db()
         result = (
             db.table("event_candidates")
-            .select("*, candidates(first_name, last_name, phone_number, telegram_username)")
+            .select("*, candidates(first_name, last_name, full_name, gender, phone_number, telegram_username, primary_role)")
             .eq("event_id", event_id)
             .eq("selected", True)
             .execute()
@@ -202,15 +202,8 @@ async def confirm_candidate(event_id: str, user_id: int) -> bool:
         return False
 
 
-async def update_gender(user_id: int, gender: str) -> bool:
-    """Сохранить пол кандидата."""
-    try:
-        db = get_db()
-        db.table("candidates").update({"gender": gender}).eq("user_id", user_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка сохранения пола для {user_id}: {e}")
-        return False
+# BUG-6 FIX: Removed duplicate `update_gender` function (old version).
+# The canonical version is `update_candidate_gender` defined earlier.
 
 
 async def get_candidate_profile(user_id: int) -> Optional[Candidate]:
@@ -249,19 +242,17 @@ async def register_for_event(event_id: str, user_id: int, role: str, arrival_tim
     """Зарегистрировать кандидата на конкретное мероприятие."""
     try:
         db = get_db()
-        # Сначала сохраняем роль и время в связующую таблицу
-        # Мы предполагаем, что запись в event_candidates уже есть (из-за голосования или просто создаем ее)
-        res = db.table("event_candidates").upsert({
+        # Сохраняем заголосование и выбранное время в связующую таблицу
+        db.table("event_candidates").upsert({
             "event_id": event_id,
             "user_id": user_id,
             "vote_status": "yes",
             "arrival_time": arrival_time,
-            "selected": False, # Рекрутер должен будет подтвердить
+            "selected": False,  # Рекрутер должен будет подтвердить
         }).execute()
         
-        # Также обновим основную роль кандидата, если она не задана
-        cand = await get_candidate_profile(user_id)
-        if cand and not cand.primary_role:
+        # BUG-7 FIX: Всегда обновляем роль кандидата (не только если пуста)
+        if role:
             await update_candidate_role(user_id, role)
             
         return True

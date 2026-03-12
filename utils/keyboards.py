@@ -88,13 +88,21 @@ def get_events_list_keyboard(events: list) -> InlineKeyboardMarkup:
         btn_text = f"📅 {ev.date} | {ev.title}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"manage:{ev.event_id}")])
     return InlineKeyboardMarkup(keyboard)
-def get_role_selection_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора роли при регистрации."""
+def get_role_selection_keyboard():
+    """Reply-клавиатура выбора роли."""
+    from telegram import ReplyKeyboardMarkup
     keyboard = [
-        [InlineKeyboardButton("👨‍💼 Я Рекрутер (Company Admin)", callback_data="role:recruiter")],
-        [InlineKeyboardButton("🙋‍♂️ Я Кандидат (Waiter)", callback_data="role:candidate")],
+        ["👨‍💼 Я Рекрутер (Company Admin)"],
+        ["🙋‍♂️ Я Кандидат (Waiter)"]
     ]
-    return InlineKeyboardMarkup(keyboard)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+
+def get_gender_keyboard():
+    """Reply-клавиатура выбора пола."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [["👨 Мужской", "👩 Женский"]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 
 # ─── Новые клавиатуры для SaaS сценария ───────────────────────────────────────
@@ -131,6 +139,34 @@ def get_invitation_keyboard(event_id: str) -> InlineKeyboardMarkup:
     ])
 
 
+def get_onboarding_role_reply_keyboard(roles: list[str]):
+    """Reply-клавиатура выбора роли."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [[r] for r in roles]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+
+def get_onboarding_gender_reply_keyboard():
+    """Reply-клавиатура выбора пола."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [["👨 Мужской", "👩 Женский"]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+
+def get_onboarding_time_reply_keyboard(times: list[str]):
+    """Reply-клавиатура выбора времени."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [[t] for t in times]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+
+def get_onboarding_confirm_reply_keyboard():
+    """Reply-клавиатура подтверждения регистрации."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [["✅ Подтвердить"], ["✏️ Изменить"]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+
 def get_checkin_keyboard(event_id: str) -> InlineKeyboardMarkup:
     """Кнопка 'Я пришел' для кандидата."""
     return InlineKeyboardMarkup([[
@@ -138,37 +174,61 @@ def get_checkin_keyboard(event_id: str) -> InlineKeyboardMarkup:
     ]])
 
 
-def get_recruiter_dashboard_keyboard() -> InlineKeyboardMarkup:
-    """Этап 1 — Главная панель рекрутера."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🆕 Создать мероприятие", callback_data="ev_create")],
-        [InlineKeyboardButton("📅 Активные мероприятия", callback_data="ev_active")],
-        [InlineKeyboardButton("📊 Отчеты", callback_data="ev_reports")]
-    ])
+def get_recruiter_dashboard_keyboard():
+    """Главная Reply-клавиатура рекрутера."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [
+        ["🆕 Создать мероприятие", "📋 Мои мероприятия"],
+        ["📊 Отчеты", "❓ Помощь"],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-def get_candidate_card_keyboard(event_id: str, candidate_id: int) -> InlineKeyboardMarkup:
-    """Этап 5 — Карточка кандидата."""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Принять", callback_data=f"card_accept:{event_id}:{candidate_id}"),
-            InlineKeyboardButton("❌ Отклонить", callback_data=f"card_reject:{event_id}:{candidate_id}")
-        ],
-        [InlineKeyboardButton("➡️ Следующий", callback_data=f"card_next:{event_id}")]
-    ])
+def get_events_list_reply_keyboard(events: list):
+    """Reply-клавиатура со списком мероприятий (для выбора)."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = []
+    for ev in events:
+        label = f"📅 {ev.date} | {ev.title}"
+        keyboard.append([label])
+    keyboard.append(["⬅️ Назад в меню"])
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-def get_event_post_creation_keyboard(event_id: str) -> InlineKeyboardMarkup:
-    """Этап 3 — Мероприятие создано."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 Опубликовать в группу", callback_data=f"ev_publish:{event_id}")],
-        [
-            InlineKeyboardButton("👥 Карточки", callback_data=f"ev_cands:{event_id}"),
-            InlineKeyboardButton("🤖 Автоотбор", callback_data=f"ev_select:{event_id}")
-        ],
-        [InlineKeyboardButton("⚙️ Настройки", callback_data=f"ev_settings:{event_id}")],
-        [InlineKeyboardButton("⬅️ К списку мероприятий", callback_data="ev_active")]
-    ])
+def get_event_action_reply_keyboard(event_title: str):
+    """Reply-клавиатура действий с выбранным мероприятием."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [
+        ["📢 Опубликовать", "👥 Карточки"],
+        ["✉️ Уведомить", "📄 Экспорт Excel"],
+        ["⏰ Назначить время", "🤖 Автоотбор"],
+        ["📊 Логи", "❌ Архивировать"],
+        ["⬅️ К списку мероприятий"],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+
+def get_candidate_card_keyboard():
+    """Reply-клавиатура управления карточками (Этап 5)."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [
+        ["✅ Принять", "❌ Отклонить"],
+        ["➡️ Следующий"],
+        ["⬅️ Назад к управлению"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+def get_event_post_creation_keyboard():
+    """Reply-клавиатура после создания мероприятия."""
+    from telegram import ReplyKeyboardMarkup
+    keyboard = [
+        ["📢 Опубликовать", "👥 Карточки"],
+        ["✉️ Уведомить", "📄 Экспорт Excel"],
+        ["🤖 Автоотбор", "⬅️ К списку"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
 def get_set_times_keyboard(selected_candidates: list, event_id: str) -> InlineKeyboardMarkup:

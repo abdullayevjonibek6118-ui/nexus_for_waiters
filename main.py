@@ -15,7 +15,15 @@ from config import settings
 
 # Хендлеры
 from handlers.start import start_command, help_command
-from handlers.event_handler import get_create_event_handler, list_events, handle_event_action_callback, events_dashboard
+from handlers.event_handler import (
+    get_create_event_handler, 
+    list_events, 
+    handle_event_action_callback, 
+    events_dashboard,
+    handle_recruiter_menu,
+    handle_event_selection,
+    handle_event_menu_action
+)
 from handlers.onboarding_handler import get_onboarding_handler
 from handlers.poll_handler import publish_poll, close_poll
 from handlers.candidate_handler import (
@@ -29,7 +37,9 @@ from handlers.candidate_handler import (
     handle_set_time_callback,
     handle_time_message_input,
     handle_card_callback,
+    handle_card_action,
     handle_checkin,
+    handle_confirm_checkin_callback,
     handle_auto_select_input,
     handle_general_name_input,
 )
@@ -43,7 +53,7 @@ from handlers.admin_handler import (
     announce_cmd,
 )
 from handlers.super_admin_handler import owner_cmd, get_super_admin_handler, sa_callback_handler
-from handlers.role_handler import handle_role_callback
+from handlers.role_handler import handle_role_callback, handle_role_selection
 
 # Планировщик (инициализация)
 from services.scheduler_service import get_scheduler, get_scheduler_async
@@ -127,13 +137,39 @@ def main() -> None:
     ))
     app.add_handler(CallbackQueryHandler(handle_card_callback, pattern=r"^card_(accept|reject|next)"))
     app.add_handler(CallbackQueryHandler(handle_checkin, pattern=r"^checkin_"))
+    app.add_handler(CallbackQueryHandler(handle_confirm_checkin_callback, pattern=r"^c_chk:"))
     app.add_handler(CallbackQueryHandler(handle_set_gender, pattern=r"^set_gender:"))
     app.add_handler(CallbackQueryHandler(handle_role_callback, pattern=r"^role:"))
     app.add_handler(CallbackQueryHandler(sa_callback_handler, pattern=r"^sa:"))
     app.add_handler(CallbackQueryHandler(handle_set_time_callback, pattern=r"^st_(all|one):"))
 
-    # ── Неизвестные команды ──────────────────────────────────────────────────
-    # Обработка разных типов текстового ввода
+    # ── Неизвестные команды & Текстовые кнопки ──────────────────────────────
+    # Группы приоритетов для обработки Reply-кнопок
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^(👨‍💼 Я Рекрутер|🙋‍♂️ Я Кандидат)"),
+        handle_role_selection
+    ), group=0)
+
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^(🆕 Создать мероприятие|📋 Мои мероприятия|📊 Отчеты|❓ Помощь)$"),
+        handle_recruiter_menu
+    ), group=0)
+    
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^(📅|⬅️ Назад в меню)"),
+        handle_event_selection
+    ), group=0)
+    
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^(📢 Опубликовать|👥 Карточки|✉️ Уведомить|📄 Экспорт Excel|⏰ Назначить время|🤖 Автоотбор|📊 Логи|❌ Архивировать|⬅️ К списку мероприятий)"),
+        handle_event_menu_action
+    ), group=0)
+
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^(✅ Принять|❌ Отклонить|➡️ Следующий|⬅️ Назад к управлению)"),
+        handle_card_action
+    ), group=0)
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_auto_select_input), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_time_message_input), group=2)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_general_name_input), group=3)

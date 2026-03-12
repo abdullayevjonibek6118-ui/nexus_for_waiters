@@ -56,8 +56,14 @@ async def create_event_sheet(
         rows = []
         for c in candidates:
             profile = c.get("candidates", {}) or {}
-            full_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
-            gender = profile.get("gender", "—")
+            db_full_name = profile.get("full_name")
+            if db_full_name:
+                full_name = db_full_name
+            else:
+                full_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+            
+            gender_raw = profile.get("gender", "—")
+            gender = "Мужской" if gender_raw == "Male" else "Женский" if gender_raw == "Female" else gender_raw
             phone = profile.get("phone_number", "—")
             arrival = c.get("arrival_time", "—")
             departure = c.get("departure_time", "—")
