@@ -232,6 +232,7 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     saved = await event_service.create_event(event)
     if saved:
+        context.user_data["selected_event_id"] = saved.event_id
         from utils.keyboards import get_event_post_creation_keyboard
         roles_str = ", ".join(context.user_data["ev_roles"])
         times_str = ", ".join(context.user_data["ev_times"])
