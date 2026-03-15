@@ -2,7 +2,7 @@
 Nexus AI — Утилиты: Inline-клавиатуры
 """
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from config.constants import VoteStatus
+from utils.constants import VoteStatus
 
 
 def get_event_keyboard(event_id: str) -> InlineKeyboardMarkup:

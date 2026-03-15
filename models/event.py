@@ -5,18 +5,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class EventStatus(str, Enum):
-    DRAFT = "Draft"
-    POLL_PUBLISHED = "Poll_Published"
-    RECRUITING = "Recruiting"
-    SELECTION_COMPLETED = "Selection_Completed"
-    TIMES_ASSIGNED = "Times_Assigned"
-    SHEET_GENERATED = "Sheet_Generated"
-    CANDIDATES_CONFIRMED = "Candidates_Confirmed"
-    COMPLETED = "Completed"
-    PAYMENT_PENDING = "Payment_Pending"
-    CLOSED = "Closed"
-    CANCELLED = "Cancelled"
+from utils.constants import EventStatus
 
 
 class Event(BaseModel):

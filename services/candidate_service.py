@@ -5,7 +5,8 @@ Nexus AI — Candidate Service
 import logging
 from typing import Optional, List
 from database import get_db
-from models.candidate import Candidate, VoteStatus
+from models.candidate import Candidate
+from utils.constants import VoteStatus
 from models.event_candidate import EventCandidate
 from utils.exceptions import DatabaseError, NexusError
 

@@ -4,10 +4,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class VoteStatus(str, Enum):
-    YES = "yes"
-    NO = "no"
-    MAYBE = "maybe"
+from utils.constants import VoteStatus
 
 
 class Candidate(BaseModel):

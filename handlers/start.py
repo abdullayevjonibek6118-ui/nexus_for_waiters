@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKe
 from telegram.ext import ContextTypes
 from config import settings
 from services import recruiter_service, company_service, candidate_service
-from utils.keyboards import get_role_selection_keyboard, get_gender_keyboard
+from utils.keyboards import get_role_selection_keyboard, get_gender_inline_keyboard
 
 from handlers.onboarding_handler import start_onboarding
 

@@ -5,7 +5,7 @@ Nexus AI — Role Handler
 from telegram import Update
 from telegram.ext import ContextTypes
 from services import recruiter_service, candidate_service
-from utils.keyboards import get_gender_keyboard
+from utils.keyboards import get_gender_inline_keyboard
 
 async def handle_role_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработка выбора роли через Reply-кнопки."""
@@ -29,7 +29,7 @@ async def handle_role_selection(update: Update, context: ContextTypes.DEFAULT_TY
             "🙋‍♂️ <b>Регистрация кандидата</b>\n\n"
             "Пожалуйста, <b>выберите ваш пол</b> для завершения регистрации:"
         )
-        await update.message.reply_html(msg, reply_markup=get_gender_keyboard())
+        await update.message.reply_html(msg, reply_markup=get_gender_inline_keyboard())
 
 
 async def handle_role_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -56,4 +56,4 @@ async def handle_role_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             "🙋‍♂️ <b>Регистрация кандидата</b>\n\n"
             "Пожалуйста, <b>выберите ваш пол</b> для завершения регистрации:"
         )
-        await query.message.reply_html(text, reply_markup=get_gender_keyboard())
+        await query.message.reply_html(text, reply_markup=get_gender_inline_keyboard())

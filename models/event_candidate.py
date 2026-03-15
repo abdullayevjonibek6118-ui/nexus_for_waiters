@@ -1,7 +1,7 @@
 """Модели данных для связки Event <-> Candidate."""
 from typing import Optional
 from pydantic import BaseModel
-from models.candidate import VoteStatus
+from utils.constants import VoteStatus
 
 
 class EventCandidate(BaseModel):

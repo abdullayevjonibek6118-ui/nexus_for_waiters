@@ -6,7 +6,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from config import settings
-from models.candidate import VoteStatus
+from utils.constants import VoteStatus
 from services import event_service, candidate_service, audit_service, recruiter_service
 
 logger = logging.getLogger(__name__)
