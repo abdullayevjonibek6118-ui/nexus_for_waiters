@@ -62,8 +62,11 @@ async def list_voters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def show_candidate_cards(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str = None) -> None:
     """Отображение карточек кандидатов по очереди."""
     if not event_id:
-        if context.args: event_id = context.args[0]
-        else: return
+        if context.args: 
+            event_id = context.args[0]
+        else: 
+            await update.effective_message.reply_text("⚠️ Ошибка: Мероприятие не выбрано. Используйте /events.")
+            return
 
     # Сохраняем текущее мероприятие для Reply-обработчика
     context.user_data["current_card_event_id"] = event_id
@@ -130,6 +133,7 @@ async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Мы можем хранить current_card_event_id в user_data
     event_id = context.user_data.get("current_card_event_id")
     if not event_id:
+        await update.message.reply_text("⚠️ Сессия истекла. Вернитесь к списку через /events.")
         return
 
     state = context.user_data.get(f"cards_{event_id}")
@@ -377,14 +381,17 @@ async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TY
     for c in selected:
         user_id = c.get("user_id")
         arrival = c.get("arrival_time", "уточняется")
+        departure = c.get("departure_time", "уточняется")
+        time_str = f"{arrival} - {departure}" if arrival != "уточняется" and departure != "уточняется" else arrival
+        payment_str = event.payment if event.payment else "По договоренности"
 
         msg = (
             f"🎉 <b>Вы приглашены на мероприятие</b>\n\n"
             f"<b>{event.title}</b>\n\n"
             f"📅 Дата: {event.date}\n"
-            f"⏰ Время прихода: {arrival}\n"
+            f"⏰ Время работы: {time_str}\n"
             f"📍 Место: {event.location}\n"
-            f"💰 Оплата: 4000 ₽\n\n"
+            f"💰 Оплата: {payment_str}\n\n"
         )
         try:
             await context.bot.send_message(

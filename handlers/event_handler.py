@@ -364,6 +364,10 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
     event_id = context.user_data.get("selected_event_id")
     
     if not event_id and text != "⬅️ К списку мероприятий":
+        await update.message.reply_html(
+            "⚠️ <b>Сессия истекла или бот был перезагружен.</b>\n\n"
+            "Пожалуйста, выберите мероприятие заново из списка через /events."
+        )
         return
 
     if text == "📢 Опубликовать":
