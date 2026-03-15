@@ -16,6 +16,7 @@ class EventStatus(str, Enum):
     COMPLETED = "Completed"
     PAYMENT_PENDING = "Payment_Pending"
     CLOSED = "Closed"
+    CANCELLED = "Cancelled"
 
 
 class Event(BaseModel):

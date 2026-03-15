@@ -68,7 +68,15 @@ async def get_active_events(company_id: Optional[str] = None) -> List[Event]:
             query = query.eq("company_id", company_id)
             
         result = query.order("date").execute()
-        return [Event(**row) for row in (result.data or [])]
+        
+        events = []
+        for row in (result.data or []):
+            try:
+                events.append(Event(**row))
+            except Exception as parse_err:
+                logger.warning(f"Skipping malformed event {row.get('event_id', 'unknown')}: {parse_err}")
+                
+        return events
     except Exception as e:
         logger.error(f"Ошибка получения мероприятий: {e}")
         return []
