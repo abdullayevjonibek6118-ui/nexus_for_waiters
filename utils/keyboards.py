@@ -2,6 +2,7 @@
 Nexus AI — Утилиты: Inline-клавиатуры
 """
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from config.constants import VoteStatus
 
 
 def get_event_keyboard(event_id: str) -> InlineKeyboardMarkup:
@@ -42,8 +43,8 @@ def get_confirm_keyboard(event_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_gender_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора пола."""
+def get_gender_inline_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора пола (Inline)."""
     keyboard = [
         [
             InlineKeyboardButton("👨 Мужской", callback_data="set_gender:Male"),
@@ -62,7 +63,7 @@ def get_candidate_select_keyboard(
         profile = c.get("candidates", {}) or {}
         full_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
         vote = c.get("vote_status", "?")
-        emoji = {"yes": "✅", "maybe": "🤔", "no": "❌"}.get(vote, "❓")
+        emoji = {VoteStatus.YES: "✅", VoteStatus.MAYBE: "🤔", VoteStatus.NO: "❌"}.get(vote, "❓")
         user_id = c.get("user_id")
         keyboard.append([
             InlineKeyboardButton(
@@ -88,6 +89,8 @@ def get_events_list_keyboard(events: list) -> InlineKeyboardMarkup:
         btn_text = f"📅 {ev.date} | {ev.title}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"manage:{ev.event_id}")])
     return InlineKeyboardMarkup(keyboard)
+
+
 def get_role_selection_keyboard():
     """Reply-клавиатура выбора роли."""
     from telegram import ReplyKeyboardMarkup
@@ -95,13 +98,6 @@ def get_role_selection_keyboard():
         ["👨‍💼 Я Рекрутер (Company Admin)"],
         ["🙋‍♂️ Я Кандидат (Waiter)"]
     ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-
-
-def get_gender_keyboard():
-    """Reply-клавиатура выбора пола."""
-    from telegram import ReplyKeyboardMarkup
-    keyboard = [["👨 Мужской", "👩 Женский"]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 
@@ -115,8 +111,7 @@ def get_onboarding_start_keyboard(event_id: str) -> InlineKeyboardMarkup:
 
 
 def get_dynamic_choice_keyboard(items: list[str], prefix: str, omit_event_id: bool = True) -> InlineKeyboardMarkup:
-    """Универсальная клавиатура для выбора роли или времени.
-    Убрали передачу event_id, чтобы избежать ошибки Button_data_invalid (лимит 64 байта)."""
+    """Универсальная клавиатура для выбора роли или времени."""
     keyboard = []
     for item in items:
         keyboard.append([InlineKeyboardButton(item, callback_data=f"{prefix}:{item}")])
@@ -206,7 +201,6 @@ def get_event_action_reply_keyboard(event_title: str):
         ["⬅️ К списку мероприятий"],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
 
 
 def get_candidate_card_keyboard():

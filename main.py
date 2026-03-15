@@ -9,6 +9,7 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     PollAnswerHandler,
+    PicklePersistence,
     filters,
 )
 from config import settings
@@ -86,10 +87,14 @@ def main() -> None:
         
         logger.info("✅ Планировщик задач запущен")
 
+    # Инициализация персистентного хранилища
+    persistence = PicklePersistence(filepath="bot_persistence.pickle")
+
     # Создать приложение с увеличенными таймаутами
     app = (
         Application.builder()
         .token(settings.bot_token)
+        .persistence(persistence)
         .post_init(on_startup)
         .connect_timeout(30)
         .read_timeout(60)

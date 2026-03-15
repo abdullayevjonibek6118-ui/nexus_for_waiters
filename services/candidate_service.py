@@ -7,9 +7,9 @@ from typing import Optional, List
 from database import get_db
 from models.candidate import Candidate, VoteStatus
 from models.event_candidate import EventCandidate
+from utils.exceptions import DatabaseError, NexusError
 
 logger = logging.getLogger(__name__)
-
 
 async def get_or_create_candidate(user_id: int, first_name: str,
                                    last_name: Optional[str] = None,
@@ -19,7 +19,7 @@ async def get_or_create_candidate(user_id: int, first_name: str,
         db = get_db()
         result = db.table("candidates").select("*").eq("user_id", user_id).execute()
         if result.data:
-            # Обновляем существующего кандидата (например, если сменил ник)
+            # Обновляем существующего кандидата
             db.table("candidates").update({
                 "first_name": first_name,
                 "last_name": last_name or "",
@@ -27,7 +27,6 @@ async def get_or_create_candidate(user_id: int, first_name: str,
             }).eq("user_id", user_id).execute()
             return Candidate(**result.data[0])
 
-        # Создать нового кандидата
         new_candidate = {
             "user_id": user_id,
             "first_name": first_name,
@@ -41,8 +40,7 @@ async def get_or_create_candidate(user_id: int, first_name: str,
         return Candidate(**new_candidate)
     except Exception as e:
         logger.error(f"Ошибка get_or_create_candidate для {user_id}: {e}")
-        return Candidate(user_id=user_id, first_name=first_name)
-
+        raise DatabaseError(f"Ошибка при работе с профилем кандидата: {e}")
 
 async def update_phone_number(user_id: int, phone: str) -> bool:
     """Сохранить номер телефона кандидата."""
@@ -52,8 +50,7 @@ async def update_phone_number(user_id: int, phone: str) -> bool:
         return True
     except Exception as e:
         logger.error(f"Ошибка сохранения телефона для {user_id}: {e}")
-        return False
-
+        raise DatabaseError(f"Ошибка сохранения телефона: {e}")
 
 async def update_candidate_gender(user_id: int, gender: str) -> bool:
     """Установить пол кандидата (Male/Female)."""
@@ -63,36 +60,21 @@ async def update_candidate_gender(user_id: int, gender: str) -> bool:
         return True
     except Exception as e:
         logger.error(f"Ошибка сохранения пола кандидата {user_id}: {e}")
-        return False
-
+        raise DatabaseError(f"Ошибка сохранения пола: {e}")
 
 async def save_vote(event_id: str, user_id: int, vote_status: VoteStatus) -> bool:
-    """Сохранить голос кандидата за мероприятие."""
+    """Сохранить голос кандидата за мероприятие (используя upsert для атомарности)."""
     try:
         db = get_db()
-        existing = (
-            db.table("event_candidates")
-            .select("id")
-            .eq("event_id", event_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
-        if existing.data:
-            db.table("event_candidates").update(
-                {"vote_status": vote_status.value}
-            ).eq("event_id", event_id).eq("user_id", user_id).execute()
-        else:
-            db.table("event_candidates").insert({
-                "event_id": event_id,
-                "user_id": user_id,
-                "vote_status": vote_status.value,
-                "selected": False,
-                "confirmed": False,
-            }).execute()
+        db.table("event_candidates").upsert({
+            "event_id": event_id,
+            "user_id": user_id,
+            "vote_status": vote_status.value,
+        }).execute()
         return True
     except Exception as e:
         logger.error(f"Ошибка сохранения голоса: {e}")
-        return False
+        raise DatabaseError(f"Ошибка сохранения голоса в БД: {e}")
 
 
 async def get_voters(event_id: str) -> List[dict]:
@@ -109,7 +91,7 @@ async def get_voters(event_id: str) -> List[dict]:
         return result.data or []
     except Exception as e:
         logger.error(f"Ошибка получения голосующих: {e}")
-        return []
+        raise DatabaseError(f"Ошибка получения списка голосующих: {e}")
 
 
 async def get_event_candidate(event_id: str, user_id: int) -> dict:
@@ -141,7 +123,7 @@ async def select_candidate(event_id: str, user_id: int, selected: bool = True) -
         return True
     except Exception as e:
         logger.error(f"Ошибка выбора кандидата {user_id}: {e}")
-        return False
+        raise DatabaseError(f"Ошибка при выборе кандидата: {e}")
 
 
 async def reset_event_selections(event_id: str) -> bool:
@@ -154,7 +136,7 @@ async def reset_event_selections(event_id: str) -> bool:
         return True
     except Exception as e:
         logger.error(f"Ошибка сброса выбора кандидатов для {event_id}: {e}")
-        return False
+        raise DatabaseError(f"Ошибка сброса выбора: {e}")
 
 
 async def get_selected_candidates(event_id: str) -> List[dict]:
@@ -171,7 +153,7 @@ async def get_selected_candidates(event_id: str) -> List[dict]:
         return result.data or []
     except Exception as e:
         logger.error(f"Ошибка получения выбранных кандидатов: {e}")
-        return []
+        raise DatabaseError(f"Ошибка при получении списка выбранных кандидатов: {e}")
 
 
 async def set_arrival_departure(event_id: str, user_id: int,
@@ -186,7 +168,7 @@ async def set_arrival_departure(event_id: str, user_id: int,
         return True
     except Exception as e:
         logger.error(f"Ошибка установки времени для {user_id}: {e}")
-        return False
+        raise DatabaseError(f"Ошибка установки времени: {e}")
 
 
 async def confirm_candidate(event_id: str, user_id: int) -> bool:
@@ -199,7 +181,7 @@ async def confirm_candidate(event_id: str, user_id: int) -> bool:
         return True
     except Exception as e:
         logger.error(f"Ошибка подтверждения кандидата {user_id}: {e}")
-        return False
+        raise DatabaseError(f"Ошибка подтверждения участия: {e}")
 
 
 # BUG-6 FIX: Removed duplicate `update_gender` function (old version).
@@ -216,7 +198,7 @@ async def get_candidate_profile(user_id: int) -> Optional[Candidate]:
         return None
     except Exception as e:
         logger.error(f"Ошибка получения профиля {user_id}: {e}")
-        return None
+        raise DatabaseError(f"Ошибка получения профиля: {e}")
 
 async def update_candidate_full_name(user_id: int, full_name: str) -> bool:
     """Обновить ФИО кандидата."""
@@ -226,7 +208,7 @@ async def update_candidate_full_name(user_id: int, full_name: str) -> bool:
         return True
     except Exception as e:
         logger.error(f"Ошибка обновления ФИО для {user_id}: {e}")
-        return False
+        raise DatabaseError(f"Ошибка обновления ФИО: {e}")
 
 async def update_candidate_role(user_id: int, role: str) -> bool:
     """Обновить роль кандидата."""

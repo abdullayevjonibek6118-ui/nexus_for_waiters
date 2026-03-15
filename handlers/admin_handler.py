@@ -37,6 +37,13 @@ async def create_sheet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
 
+    # Изоляция данных: проверяем принадлежность мероприятия компании рекрутера
+    if update.effective_user.id != settings.super_admin_id:
+        recruiter = await recruiter_service.get_recruiter(update.effective_user.id)
+        if not recruiter or str(recruiter.get("company_id")) != str(event.company_id):
+            await update.effective_message.reply_text("⛔ Ошибка доступа: Это мероприятие принадлежит другой компании.")
+            return
+
     await update.effective_message.reply_text("⏳ Создаю Google Sheet...")
 
     selected = await candidate_service.get_selected_candidates(event_id)
@@ -80,6 +87,13 @@ async def payment_reminder_cmd(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
 
+    # Изоляция данных
+    if update.effective_user.id != settings.super_admin_id:
+        recruiter = await recruiter_service.get_recruiter(update.effective_user.id)
+        if not recruiter or str(recruiter.get("company_id")) != str(event.company_id):
+            await update.effective_message.reply_text("⛔ Ошибка доступа.")
+            return
+
     job_id = await scheduler_service.schedule_payment_reminder(
         event_id=event_id,
         event_title=event.title,
@@ -111,6 +125,18 @@ async def payment_confirmed_cmd(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     event_id = context.args[0]
+    event = await event_service.get_event(event_id)
+    if not event:
+        await update.effective_message.reply_text("❌ Мероприятие не найдено.")
+        return
+
+    # Изоляция данных
+    if update.effective_user.id != settings.super_admin_id:
+        recruiter = await recruiter_service.get_recruiter(update.effective_user.id)
+        if not recruiter or str(recruiter.get("company_id")) != str(event.company_id):
+            await update.effective_message.reply_text("⛔ Ошибка доступа.")
+            return
+
     job_id = f"payment_reminder_{event_id}"
     scheduler_service.cancel_reminder(job_id)
 
@@ -135,6 +161,18 @@ async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     event_id = context.args[0]
+    
+    # Изоляция данных
+    if update.effective_user.id != settings.super_admin_id:
+        event = await event_service.get_event(event_id)
+        if not event:
+            await update.effective_message.reply_text("❌ Мероприятие не найдено.")
+            return
+        recruiter = await recruiter_service.get_recruiter(update.effective_user.id)
+        if not recruiter or str(recruiter.get("company_id")) != str(event.company_id):
+            await update.effective_message.reply_text("⛔ Ошибка доступа.")
+            return
+
     logs = await audit_service.get_event_logs(event_id, limit=15)
     if not logs:
         await update.effective_message.reply_text("📭 Нет записей в логе.")
@@ -165,6 +203,13 @@ async def close_event_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
 
+    # Изоляция данных
+    if update.effective_user.id != settings.super_admin_id:
+        recruiter = await recruiter_service.get_recruiter(update.effective_user.id)
+        if not recruiter or str(recruiter.get("company_id")) != str(event.company_id):
+            await update.effective_message.reply_text("⛔ Ошибка доступа.")
+            return
+
     await event_service.update_event_status(event_id, EventStatus.CLOSED)
     await audit_service.log_action(event_id, "event_closed", update.effective_user.id, {})
 
@@ -188,6 +233,13 @@ async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not event:
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
+
+    # Изоляция данных
+    if update.effective_user.id != settings.super_admin_id:
+        recruiter = await recruiter_service.get_recruiter(update.effective_user.id)
+        if not recruiter or str(recruiter.get("company_id")) != str(event.company_id):
+            await update.effective_message.reply_text("⛔ Ошибка доступа.")
+            return
 
     selected = await candidate_service.get_selected_candidates(event_id)
     if not selected:
@@ -246,6 +298,13 @@ async def announce_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not event:
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
+
+    # Изоляция данных
+    if update.effective_user.id != settings.super_admin_id:
+        recruiter = await recruiter_service.get_recruiter(update.effective_user.id)
+        if not recruiter or str(recruiter.get("company_id")) != str(event.company_id):
+            await update.effective_message.reply_text("⛔ Ошибка доступа.")
+            return
 
     selected = await candidate_service.get_selected_candidates(event_id)
     if not selected:

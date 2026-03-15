@@ -75,19 +75,27 @@ def generate_event_xlsx(event_title: str, event_date: str, event_location: str, 
         if arrival != "—" and departure != "—":
             try:
                 # Очистка времени на случай лишних пробелов или спецсимволов
-                arrival_clean = arrival.strip()
-                departure_clean = departure.strip()
+                arrival_clean = str(arrival).strip()
+                departure_clean = str(departure).strip()
                 
+                # Попытка парсинга разных форматов (на всякий случай)
                 fmt = "%H:%M"
-                t1 = datetime.strptime(arrival_clean, fmt)
-                t2 = datetime.strptime(departure_clean, fmt)
+                try:
+                    t1 = datetime.strptime(arrival_clean, fmt)
+                    t2 = datetime.strptime(departure_clean, fmt)
+                except ValueError:
+                    # Если вдруг попал формат H:M
+                    t1 = datetime.strptime(arrival_clean, "%H:%M" if ":" in arrival_clean else "%H")
+                    t2 = datetime.strptime(departure_clean, "%H:%M" if ":" in departure_clean else "%H")
+
                 delta = t2 - t1
                 # Если уход на следующий день (редко, но бывает)
                 if delta.total_seconds() < 0:
                     hours = round((delta.total_seconds() + 86400) / 3600, 2)
                 else:
                     hours = round(delta.total_seconds() / 3600, 2)
-            except Exception:
+            except Exception as e:
+                logger.error(f"Error calculating hours for {arrival}-{departure}: {e}")
                 hours = 0
 
         # Вставляем данные

@@ -209,7 +209,20 @@ async def handle_ev_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return E_TIMES
 
 async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    times = [t.strip() for t in update.message.text.split(",")]
+    from utils.validators import validate_time_format
+    
+    raw_text = update.message.text.strip()
+    times = [t.strip() for t in raw_text.split(",")]
+    
+    # Валидация каждого времени
+    invalid_times = [t for t in times if not validate_time_format(t)]
+    if invalid_times:
+        await update.message.reply_html(
+            f"❌ <b>Неверный формат времени:</b> {', '.join(invalid_times)}\n\n"
+            "Пожалуйста, используйте формат <code>HH:MM</code> (например: <code>09:00, 18:30</code>)."
+        )
+        return E_TIMES
+
     context.user_data["ev_times"] = times
     
     user = update.effective_user

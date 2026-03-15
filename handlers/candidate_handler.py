@@ -51,7 +51,9 @@ async def list_voters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         tg = p.get("telegram_username", "")
         text += f"{vote_emoji} {name}"
         if tg:
-            text += f" (@{tg})"
+            # Ensure single @ prefix
+            tg_formatted = f"@{tg.lstrip('@')}"
+            text += f" ({tg_formatted})"
         text += "\n"
 
     await update.effective_message.reply_html(text)
@@ -71,20 +73,20 @@ async def show_candidate_cards(update: Update, context: ContextTypes.DEFAULT_TYP
     # Сохраняем текущее мероприятие для Reply-обработчика
     context.user_data["current_card_event_id"] = event_id
 
-    # Получаем кандидатов (тех, кто подал заявку через онбординг)
+    # Получаем кандидатов вместе с профилями (N+1 Fix: один запрос вместо сотни)
     voters = await candidate_service.get_voters(event_id)
     if not voters:
         await update.effective_message.reply_text("📭 Нет заявок.")
         return
 
-    # Сохраняем в контекст состояние обхода
-    context.user_data[f"cards_{event_id}"] = {"index": 0, "uids": [v["user_id"] for v in voters]}
+    # Сохраняем в контекст состояние обхода (весь список данных)
+    context.user_data[f"cards_{event_id}"] = {"index": 0, "data": voters}
     
     await _render_card(update, context, event_id, 0)
 
 async def _render_card(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str, index: int):
     state = context.user_data.get(f"cards_{event_id}")
-    if not state or index >= len(state["uids"]):
+    if not state or index >= len(state["data"]):
         await update.effective_message.reply_html(
             "🏁 <b>Все кандидаты просмотрены!</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -92,29 +94,31 @@ async def _render_card(update: Update, context: ContextTypes.DEFAULT_TYPE, event
         )
         return
 
-    uid = state["uids"][index]
-    # BUG-5 FIX: Проверяем, что cand не None перед обращением к атрибутам
-    cand = await candidate_service.get_candidate_profile(uid)
-    if not cand:
-        # Пропускаем кандидата, если профиль не найден
-        state["index"] += 1
-        await _render_card(update, context, event_id, state["index"])
-        return
-    ec = await candidate_service.get_event_candidate(event_id, uid)
+    # Получаем данные из кеша (N+1 Optimization)
+    v_data = state["data"][index]
+    uid = v_data["user_id"]
+    cand_profile = v_data.get("candidates", {})
     
-    fullname = cand.full_name or cand.first_name
-    # BUG-3 FIX: удален ошибочный `role = ec.get("arrival_time")`
-    gender_icon = "👨" if cand.gender == "Male" else "👩" if cand.gender == "Female" else "🧑"
+    fullname = cand_profile.get("full_name") or cand_profile.get("first_name", "Неизвестно")
+    gender_raw = cand_profile.get("gender")
+    gender_icon = "👨" if gender_raw == "Male" else "👩" if gender_raw == "Female" else "🧑"
+    
+    username = cand_profile.get("telegram_username")
+    if username:
+        username_str = f"@{username.lstrip('@')}"
+    else:
+        username_str = "Скрыт"
     
     text = (
         f"🙋‍♂️ <b>Карточка кандидата</b>\n"
-        f"📦 {index + 1} из {len(state['uids'])}\n"
+        f"📦 {index + 1} из {len(state['data'])}\n"
         "━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"👤 <b>ФИО:</b> {fullname}\n"
-        f"{gender_icon} <b>Пол:</b> {'Мужской' if cand.gender == 'Male' else 'Женский' if cand.gender == 'Female' else 'Не указан'}\n"
-        f"🎭 <b>Роль:</b> {cand.primary_role or 'Не указана'}\n"
-        f"⏰ <b>Удобное время:</b> {ec.get('arrival_time', 'Не указано')}\n"
-        f"📱 <b>Телефон:</b> <code>{cand.phone_number or 'Не указан'}</code>\n\n"
+        f"🔗 <b>Профиль:</b> {username_str}\n"
+        f"{gender_icon} <b>Пол:</b> {'Мужской' if gender_raw == 'Male' else 'Женский' if gender_raw == 'Female' else 'Не указан'}\n"
+        f"🎭 <b>Роль:</b> {cand_profile.get('primary_role') or 'Не указана'}\n"
+        f"⏰ <b>Удобное время:</b> {v_data.get('arrival_time', 'Не указано')}\n"
+        f"📱 <b>Телефон:</b> <code>{cand_profile.get('phone_number') or 'Не указан'}</code>\n\n"
         "✨ <i>Примите решение по кандидату:</i>"
     )
     
@@ -137,12 +141,12 @@ async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     state = context.user_data.get(f"cards_{event_id}")
-    if not state or state["index"] >= len(state.get("uids", [])):
+    if not state or state["index"] >= len(state.get("data", [])):
         from handlers.event_handler import show_event_management_menu
         await show_event_management_menu(update, context, event_id)
         return
 
-    uid = state["uids"][state["index"]]
+    uid = state["data"][state["index"]]["user_id"]
 
     if text == "✅ Принять":
         await candidate_service.select_candidate(event_id, uid, True)
@@ -161,7 +165,7 @@ async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def handle_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()  # BUG-4 FIX: Только один раз answer() здесь
+    await query.answer()
     
     parts = query.data.split(":")
     action = parts[0]
@@ -169,18 +173,19 @@ async def handle_card_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     
     state = context.user_data.get(f"cards_{event_id}")
     if not state: return
+    
+    current_index = state.get("index", 0)
+    if current_index >= len(state.get("data", [])): return
 
     if action == "card_accept":
         uid = int(parts[2])
         await candidate_service.select_candidate(event_id, uid, True)
-        # BUG-4 FIX: Удален дублирующий query.answer()
         state["index"] += 1
         await _render_card(update, context, event_id, state["index"])
         
     elif action == "card_reject":
         uid = int(parts[2])
         await candidate_service.select_candidate(event_id, uid, False)
-        # BUG-4 FIX: Удален дублирующий query.answer()
         state["index"] += 1
         await _render_card(update, context, event_id, state["index"])
         
@@ -489,7 +494,7 @@ async def handle_set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         username=user.username,
     )
 
-    await candidate_service.update_gender(user.id, gender)
+    await candidate_service.update_candidate_gender(user.id, gender)
     
     gender_text = "Мужской" if gender == "Male" else "Женский"
     await query.edit_message_text(

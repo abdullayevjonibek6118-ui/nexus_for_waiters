@@ -7,11 +7,11 @@ import logging
 from typing import Optional, List
 from database import get_db
 from models.event import Event, EventStatus
+from utils.exceptions import EventNotFoundError, DatabaseError
 
 logger = logging.getLogger(__name__)
 
-
-async def create_event(event: Event) -> Optional[Event]:
+async def create_event(event: Event) -> Event:
     """Создать новое мероприятие в Supabase."""
     try:
         db = get_db()
@@ -34,40 +34,43 @@ async def create_event(event: Event) -> Optional[Event]:
         if result.data:
             event.event_id = event_id
             return event
-        return None
+        raise DatabaseError("Не удалось сохранить мероприятие в БД")
     except Exception as e:
         logger.error(f"Ошибка создания мероприятия: {e}")
-        return None
+        raise DatabaseError(f"Ошибка создания мероприятия: {e}")
 
 
-async def get_event(event_id: str) -> Optional[Event]:
-    """Получить мероприятие по ID."""
+async def get_event(event_id: str) -> Event:
+    """Получить мероприятие по ID. Выбрасывает EventNotFoundError, если не найдено."""
     try:
         db = get_db()
         result = db.table("events").select("*").eq("event_id", event_id).single().execute()
         if result.data:
             return Event(**result.data)
-        return None
+        raise EventNotFoundError(f"Мероприятие {event_id} не найдено")
     except Exception as e:
         logger.error(f"Ошибка получения мероприятия {event_id}: {e}")
-        return None
+        if "JSON object" in str(e) or "406" in str(e): # Supabase .single() error
+             raise EventNotFoundError(f"Мероприятие {event_id} не найдено")
+        raise DatabaseError(f"Ошибка базы данных при получении мероприятия: {e}")
 
 
-async def get_active_events(company_id: Optional[str] = None) -> List[Event]:
-    """Получить список незакрытых мероприятий (опционально по компании)."""
+async def get_active_events(company_id: str) -> List[Event]:
+    """
+    Получить список незакрытых мероприятий конкретной компании.
+    company_id теперь обязателен для обеспечения изоляции данных.
+    """
     try:
         db = get_db()
-        query = (
+        result = (
             db.table("events")
             .select("*")
+            .eq("company_id", company_id)
             .neq("status", EventStatus.CLOSED.value)
             .neq("status", EventStatus.COMPLETED.value)
+            .order("date")
+            .execute()
         )
-        
-        if company_id:
-            query = query.eq("company_id", company_id)
-            
-        result = query.order("date").execute()
         
         events = []
         for row in (result.data or []):
@@ -78,7 +81,7 @@ async def get_active_events(company_id: Optional[str] = None) -> List[Event]:
                 
         return events
     except Exception as e:
-        logger.error(f"Ошибка получения мероприятий: {e}")
+        logger.error(f"Ошибка получения мероприятий для компании {company_id}: {e}")
         return []
 
 
