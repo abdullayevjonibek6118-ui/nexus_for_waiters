@@ -82,8 +82,8 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.effective_message.reply_text("✅ Объявление о наборе опубликовано в группе!")
 
     except Exception as e:
-        logger.error(f"Ошибка публикации: {e}")
-        await update.effective_message.reply_text(f"❌ Ошибка: {e}")
+        logger.error(f"Ошибка публикации в чат {group_chat_id}: {e}")
+        await update.effective_message.reply_text(f"❌ Ошибка (Chat ID: {group_chat_id}): {e}")
 
 async def close_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
