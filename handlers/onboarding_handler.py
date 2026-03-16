@@ -154,12 +154,18 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # BUG-05: Создаём профиль перед регистрацией (Foreign Key Guard)
     await candidate_service.get_or_create_candidate(user_id, user.first_name, user.last_name, user.username)
     
-    # Сохраняем данные
+    # Сохраняем личные данные (глобально)
     await candidate_service.update_candidate_full_name(user_id, full_name)
     await candidate_service.update_phone_number(user_id, phone)
-    await candidate_service.update_candidate_gender(user_id, gender) # Сохраняем пол
-    await candidate_service.update_candidate_role(user_id, role)  # BUG-06: явно сохраняем роль
-    await candidate_service.register_for_event(event_id, user_id, role, context.user_data.get("ob_time"))
+    await candidate_service.update_candidate_gender(user_id, gender)
+    
+    # Регистрируем на ивент (через новую функцию)
+    await candidate_service.apply_for_event(
+        event_id=event_id,
+        user_id=user_id,
+        role=role,
+        arrival_time=context.user_data.get("ob_time")
+    )
     
     # BUG-07: Премиум сообщение подтверждения
     await update.message.reply_html(

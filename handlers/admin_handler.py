@@ -11,6 +11,7 @@ from telegram.constants import ParseMode
 from config import settings
 from models.event import EventStatus
 from services import event_service, candidate_service, audit_service, sheets_service, scheduler_service, excel_service, recruiter_service
+from utils.constants import ApplicationStatus
 
 logger = logging.getLogger(__name__)
 

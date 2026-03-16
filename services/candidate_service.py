@@ -6,11 +6,131 @@ import logging
 from typing import Optional, List
 from database import get_db
 from models.candidate import Candidate
+from models.event_candidate import EventCandidate, ApplicationStatus, can_transition
 from utils.constants import VoteStatus
-from models.event_candidate import EventCandidate
 from utils.exceptions import DatabaseError, NexusError
 
+# ── Исключения ───────────────────────────────────────────────────────────────
+
+class CandidateNotFoundError(NexusError):
+    """Заявка не найдена."""
+    pass
+
+class InvalidStatusTransitionError(NexusError):
+    """Попытка недопустимого перехода статуса заявки."""
+    def __init__(self, current: ApplicationStatus, target: ApplicationStatus):
+        self.current = current
+        self.target = target
+        super().__init__(
+            f"Переход {current.value} → {target.value} не разрешён"
+        )
+
 logger = logging.getLogger(__name__)
+
+# ── Единственный вход кандидата ───────────────────────────────────────────────
+
+async def apply_for_event(
+    event_id: str,
+    user_id: int,
+    role: str,
+    arrival_time: str,
+) -> bool:
+    """
+    Регистрирует кандидата на мероприятие через онбординг.
+    """
+    try:
+        db = get_db()
+        # Используем upsert: если кандидат нажал "Участвовать" дважды — обновляем данные
+        await asyncio.to_thread(
+            lambda: db.table("event_candidates").upsert({
+                "event_id": event_id,
+                "user_id": user_id,
+                "application_status": ApplicationStatus.PENDING.value,
+                "role": role,
+                "arrival_time": arrival_time,
+                # Старые поля для обратной совместимости
+                "vote_status": VoteStatus.YES.value,
+                "selected": False,
+                "confirmed": False,
+            }, on_conflict="event_id,user_id").execute()
+        )
+        return True
+    except Exception as e:
+        logger.error(f"apply_for_event error user={user_id} event={event_id}: {e}")
+        raise DatabaseError(f"Ошибка регистрации на мероприятие: {e}")
+
+
+async def transition_application(
+    event_id: str,
+    user_id: int,
+    target_status: ApplicationStatus,
+) -> bool:
+    """
+    Меняет статус заявки с проверкой допустимости перехода.
+    """
+    try:
+        db = get_db()
+        
+        # Читаем текущий статус
+        result = await asyncio.to_thread(
+            lambda: db.table("event_candidates")
+                .select("application_status")
+                .eq("event_id", event_id)
+                .eq("user_id", user_id)
+                .execute()
+        )
+        
+        if not result.data:
+            raise CandidateNotFoundError(
+                f"Заявка не найдена: user={user_id}, event={event_id}"
+            )
+        
+        current = ApplicationStatus(result.data[0]["application_status"])
+        
+        # Проверяем допустимость перехода
+        if not can_transition(current, target_status):
+            raise InvalidStatusTransitionError(current, target_status)
+        
+        # Обновляем статус + синхронизируем старые поля
+        update_data = {"application_status": target_status.value}
+        if target_status == ApplicationStatus.ACCEPTED:
+            update_data["selected"] = True
+        elif target_status == ApplicationStatus.CONFIRMED:
+            update_data["confirmed"] = True
+        elif target_status == ApplicationStatus.CHECKED_IN:
+            update_data["is_checked_in"] = True
+            update_data["is_checkin_confirmed"] = True
+        elif target_status in (ApplicationStatus.REJECTED, ApplicationStatus.DECLINED):
+            update_data["selected"] = False
+        
+        await asyncio.to_thread(
+            lambda: db.table("event_candidates")
+                .update(update_data)
+                .eq("event_id", event_id)
+                .eq("user_id", user_id)
+                .execute()
+        )
+        return True
+
+    except (CandidateNotFoundError, InvalidStatusTransitionError):
+        raise
+    except Exception as e:
+        logger.error(f"transition_application error: {e}")
+        raise DatabaseError(f"Ошибка смены статуса: {e}")
+
+
+async def record_poll_interest(event_id: str, user_id: int) -> bool:
+    """
+    Фиксирует интерес к мероприятию через опрос.
+    НЕ создаёт запись в event_candidates.
+    """
+    try:
+        # Профиль уже должен быть создан в хендлере
+        logger.info(f"Poll interest: user={user_id}, event={event_id}")
+        return True
+    except Exception as e:
+        logger.error(f"record_poll_interest error: {e}")
+        return False
 
 async def get_or_create_candidate(user_id: int, first_name: str,
                                    last_name: Optional[str] = None,
@@ -78,21 +198,43 @@ async def save_vote(event_id: str, user_id: int, vote_status: VoteStatus) -> boo
         raise DatabaseError(f"Ошибка сохранения голоса в БД: {e}")
 
 
-async def get_voters(event_id: str) -> List[dict]:
-    """Получить всех, кто проголосовал за мероприятие."""
+async def get_applicants(
+    event_id: str,
+    status: ApplicationStatus | None = None,
+) -> List[dict]:
+    """
+    Возвращает кандидатов, подавших заявку через онбординг.
+    Заменяет get_voters().
+    """
     try:
         db = get_db()
-        result = (
+        query = (
             db.table("event_candidates")
-            .select("*, candidates(first_name, last_name, full_name, gender, phone_number, telegram_username, primary_role)")
+            .select("""
+                application_status,
+                role,
+                arrival_time,
+                departure_time,
+                user_id,
+                candidates (
+                    first_name, last_name, full_name,
+                    phone_number, telegram_username, gender
+                )
+            """)
             .eq("event_id", event_id)
-            .neq("vote_status", VoteStatus.NO.value)
-            .execute()
         )
+        
+        if status is not None:
+            query = query.eq("application_status", status.value)
+        else:
+            # Исключаем poll-записи без роли (где они могли остаться)
+            query = query.not_.is_("role", "null")
+        
+        result = await asyncio.to_thread(lambda: query.execute())
         return result.data or []
     except Exception as e:
-        logger.error(f"Ошибка получения голосующих: {e}")
-        raise DatabaseError(f"Ошибка получения списка голосующих: {e}")
+        logger.error(f"get_applicants error event={event_id}: {e}")
+        raise DatabaseError(f"Ошибка получения списка кандидатов: {e}")
 
 
 async def get_event_candidate(event_id: str, user_id: int) -> dict:
@@ -114,18 +256,6 @@ async def get_event_candidate(event_id: str, user_id: int) -> dict:
         return {}
 
 
-async def select_candidate(event_id: str, user_id: int, selected: bool = True) -> bool:
-    """Пометить кандидата как выбранного/отмененного."""
-    try:
-        db = get_db()
-        db.table("event_candidates").update(
-            {"selected": selected}
-        ).eq("event_id", event_id).eq("user_id", user_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка выбора кандидата {user_id}: {e}")
-        raise DatabaseError(f"Ошибка при выборе кандидата: {e}")
-
 
 async def reset_event_selections(event_id: str) -> bool:
     """Сбросить статус `selected` для всех кандидатов мероприятия."""
@@ -139,22 +269,6 @@ async def reset_event_selections(event_id: str) -> bool:
         logger.error(f"Ошибка сброса выбора кандидатов для {event_id}: {e}")
         raise DatabaseError(f"Ошибка сброса выбора: {e}")
 
-
-async def get_selected_candidates(event_id: str) -> List[dict]:
-    """Получить список выбранных кандидатов с профилями."""
-    try:
-        db = get_db()
-        result = (
-            db.table("event_candidates")
-            .select("*, candidates(first_name, last_name, full_name, gender, phone_number, telegram_username, primary_role)")
-            .eq("event_id", event_id)
-            .eq("selected", True)
-            .execute()
-        )
-        return result.data or []
-    except Exception as e:
-        logger.error(f"Ошибка получения выбранных кандидатов: {e}")
-        raise DatabaseError(f"Ошибка при получении списка выбранных кандидатов: {e}")
 
 
 async def set_arrival_departure(event_id: str, user_id: int,
@@ -172,17 +286,8 @@ async def set_arrival_departure(event_id: str, user_id: int,
         raise DatabaseError(f"Ошибка установки времени: {e}")
 
 
-async def confirm_candidate(event_id: str, user_id: int) -> bool:
-    """Подтвердить участие кандидата."""
-    try:
-        db = get_db()
-        db.table("event_candidates").update(
-            {"confirmed": True}
-        ).eq("event_id", event_id).eq("user_id", user_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка подтверждения кандидата {user_id}: {e}")
-        raise DatabaseError(f"Ошибка подтверждения участия: {e}")
+
+# ── Профили кандидатов ───────────────────────────────────────────────────────
 
 
 # BUG-6 FIX: Removed duplicate `update_gender` function (old version).

@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 from config import settings
 from models.event import EventStatus
 from services import event_service, candidate_service, audit_service, recruiter_service
+from utils.constants import ApplicationStatus
 from utils.keyboards import (
     get_candidate_select_keyboard, 
     get_confirm_keyboard, 
@@ -38,7 +39,7 @@ async def list_voters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     event_id = context.args[0]
-    voters = await candidate_service.get_voters(event_id)
+    voters = await candidate_service.get_applicants(event_id)
     if not voters:
         await update.effective_message.reply_text("📭 Никто ещё не проголосовал.")
         return
@@ -74,7 +75,7 @@ async def show_candidate_cards(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data["current_card_event_id"] = event_id
 
     # Получаем кандидатов вместе с профилями (N+1 Fix: один запрос вместо сотни)
-    voters = await candidate_service.get_voters(event_id)
+    voters = await candidate_service.get_applicants(event_id)
     if not voters:
         await update.effective_message.reply_text("📭 Нет заявок.")
         return
@@ -148,13 +149,15 @@ async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     uid = state["data"][state["index"]]["user_id"]
 
-    if text == "✅ Принять":
-        await candidate_service.select_candidate(event_id, uid, True)
-        state["index"] += 1
-        await _render_card(update, context, event_id, state["index"])
-    elif text == "❌ Отклонить":
-        await candidate_service.select_candidate(event_id, uid, False)
-        state["index"] += 1
+    if "✅ Принять" in text:
+        await candidate_service.transition_application(event_id, uid, ApplicationStatus.ACCEPTED)
+        await update.message.reply_text(f"✅ Кандидат принят.")
+        state["index"] += 1 # Added this line to advance to the next card after accepting
+        await _render_card(update, context, event_id, state["index"]) # Added this line to render the next card
+    elif "❌ Отклонить" in text:
+        await candidate_service.transition_application(event_id, uid, ApplicationStatus.REJECTED)
+        await update.message.reply_text(f"❌ Кандидат отклонен.")
+        state["index"] += 1 # Added this line to advance to the next card after rejecting
         await _render_card(update, context, event_id, state["index"])
     elif text == "➡️ Следующий":
         state["index"] += 1
@@ -229,12 +232,12 @@ async def handle_auto_select_input(update: Update, context: ContextTypes.DEFAULT
         await update.message.reply_text("Введите число!")
         return
 
-    voters = await candidate_service.get_voters(event_id)
+    voters = await candidate_service.get_applicants(event_id)
     # Берем первых 'count' кандидатов, которые еще не отклонены
     selected_count = 0
     for v in voters:
         if selected_count >= count: break
-        await candidate_service.select_candidate(event_id, v["user_id"], True)
+        await candidate_service.transition_application(event_id, v["user_id"], ApplicationStatus.ACCEPTED)
         selected_count += 1
     
     context.user_data.pop("auto_select_event")
@@ -429,7 +432,7 @@ async def handle_candidate_confirmation(update: Update, context: ContextTypes.DE
     user = query.from_user
 
     if action == "inv_yes":
-        await candidate_service.confirm_candidate(event_id, user.id)
+        await candidate_service.transition_application(event_id, user.id, ApplicationStatus.CONFIRMED)
         await query.edit_message_text(
             "<b>Отлично!</b>\n\nВы записаны на мероприятие.\n\n"
             "Мы напомним вам за день до начала.",
@@ -442,6 +445,7 @@ async def handle_candidate_confirmation(update: Update, context: ContextTypes.DE
         )
         await audit_service.log_action(event_id, "Candidate Confirmed Participation", user.id)
     else:
+        await candidate_service.transition_application(event_id, user.id, ApplicationStatus.DECLINED)
         await query.edit_message_text(
             f"❌ Вы отказались от участия. Спасибо за ответ, {user.first_name}."
         )
@@ -456,7 +460,7 @@ async def handle_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     _, event_id = query.data.split(":")
     user_id = update.effective_user.id
     
-    await candidate_service.mark_checked_in(event_id, user_id)
+    await candidate_service.transition_application(event_id, user_id, ApplicationStatus.CHECKED_IN)
     await query.edit_message_text("✅ Вы отметили свой приход! Рекрутер подтвердит ваше присутствие.")
     
     # Уведомляем рекрутера

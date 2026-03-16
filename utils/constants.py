@@ -29,6 +29,17 @@ class VoteStatus(str, Enum):
     MAYBE = "maybe"
     NO = "no"
 
+class ApplicationStatus(str, Enum):
+    """Жизненный цикл заявки кандидата."""
+    PENDING = "pending"          # Заявка подана, ждёт решения
+    ACCEPTED = "accepted"        # Принят рекрутером
+    SCHEDULED = "scheduled"      # Время назначено
+    INVITED = "invited"          # Приглашение отправлено
+    CONFIRMED = "confirmed"      # Подтвердил участие
+    CHECKED_IN = "checked_in"    # На месте
+    REJECTED = "rejected"        # Отклонен рекрутером
+    DECLINED = "declined"        # Сам отказался
+
 class Gender(str, Enum):
     MALE = "Male"
     FEMALE = "Female"

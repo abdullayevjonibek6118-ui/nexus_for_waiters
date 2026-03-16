@@ -152,6 +152,6 @@ async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
         username=user.username,
     )
 
-    # Сохранить голос
-    await candidate_service.save_vote(event.event_id, user_id, vote)
+    # Только фиксируем интерес, не регистрируем в event_candidates автоматически
+    await candidate_service.record_poll_interest(event.event_id, user_id)
     logger.info(f"Голос сохранён: user={user_id}, event={event.event_id}, vote={vote}")
