@@ -3,6 +3,7 @@ Nexus AI — Candidate Service
 Управление профилями кандидатов и связками EventCandidate
 """
 import logging
+import asyncio
 from typing import Optional, List
 from database import get_db
 from models.candidate import Candidate
