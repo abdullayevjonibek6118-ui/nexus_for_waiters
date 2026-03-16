@@ -215,9 +215,7 @@ async def get_applicants(
         
         if status is not None:
             query = query.eq("application_status", status.value)
-        else:
-            # Исключаем poll-записи без роли (где они могли остаться)
-            query = query.not_.is_("role", "null")
+        # Убрана фильтрация по role IS NOT NULL, чтобы видеть всех кандидатов (в т.ч. из старых опросов)
         
         result = await asyncio.to_thread(lambda: query.execute())
         return result.data or []
