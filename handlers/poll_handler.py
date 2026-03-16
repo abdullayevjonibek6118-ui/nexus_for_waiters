@@ -3,10 +3,10 @@ Nexus AI — Handler: Опросы
 Команды: /publish_poll, /close_poll + PollAnswerHandler
 """
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from config import settings
-from utils.constants import VoteStatus
+from utils.constants import VoteStatus, EventStatus
 from services import event_service, candidate_service, audit_service, recruiter_service
 
 logger = logging.getLogger(__name__)
@@ -46,10 +46,12 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if not roles_text:
             roles_text = "• Промоутеры\n• Хостес\n• Регистраторы"
 
+        times_text = ", ".join(event.arrival_times) if event.arrival_times else "Не указано"
         text = (
             "📢 <b>Работа на мероприятии</b>\n\n"
             f"<b>{event.title}</b>\n\n"
             f"📅 Дата: {event.date}\n"
+            f"⏰ Время: {times_text}\n"
             f"📍 Место: {event.location}\n"
             f"💰 Оплата: {event.payment or 'По договоренности'}\n\n"
             f"Нужны сотрудники:\n{roles_text}\n\n"
@@ -58,13 +60,14 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         # Получаем компанию рекрутера для Chat ID
         rec_profile = await recruiter_service.get_recruiter(update.effective_user.id)
-        group_chat_id = rec_profile["companies"].get("group_chat_id") if rec_profile and rec_profile.get("companies") else settings.group_chat_id
-
+        group_chat_id = (rec_profile or {}).get("companies", {}).get("group_chat_id")
         if not group_chat_id:
-            await update.effective_message.reply_text("⚠️ ID группы не настроен.")
+            group_chat_id = settings.group_chat_id
+
+        if not group_chat_id or group_chat_id == 0:
+            await update.effective_message.reply_text("⚠️ ID группы не настроен для вашей компании.")
             return
 
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         bot_username = (await context.bot.get_me()).username
         url = f"https://t.me/{bot_username}?start=event_{event_id}"
         keyboard = [[InlineKeyboardButton("Участвовать", url=url)]]
@@ -82,8 +85,8 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.effective_message.reply_text("✅ Объявление о наборе опубликовано в группе!")
 
     except Exception as e:
-        logger.error(f"Ошибка публикации в чат {group_chat_id}: {e}")
-        await update.effective_message.reply_text(f"❌ Ошибка (Chat ID: {group_chat_id}): {e}")
+        logger.error(f"Ошибка публикации в чат: {e}")
+        await update.effective_message.reply_text(f"❌ Ошибка публикации: {e}")
 
 async def close_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -104,54 +107,6 @@ async def close_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.effective_message.reply_text(f"❌ Мероприятие {event_id} не найдено или опрос не опубликован.")
         return
 
-    from models.event import EventStatus
     await event_service.update_event_status(event_id, EventStatus.SELECTION_COMPLETED)
     await audit_service.log_action(event_id, "poll_closed", update.effective_user.id, {})
-
-    voters = await candidate_service.get_voters(event_id)
-    text = (
-        f"✅ Опрос закрыт!\n\n"
-        f"📊 Проголосовавших: <b>{len(voters)}</b>\n\n"
-        f"Используйте /voters {event_id} чтобы увидеть список\n"
-        f"или /select_candidates {event_id} чтобы отобрать кандидатов."
-    )
-    await update.effective_message.reply_html(text)
-
-async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    PollAnswerHandler — фиксирует каждый ответ на опрос.
-    """
-    poll_answer = update.poll_answer
-    user_id = poll_answer.user.id
-    poll_id = str(poll_answer.poll_id)
-    option_ids = poll_answer.option_ids
-
-    # Найти мероприятие по poll_id
-    event = await event_service.get_event_by_poll_id(poll_id)
-    if not event:
-        logger.warning(f"PollAnswer: мероприятие не найдено для poll_id={poll_id}")
-        return
-
-    # Определить статус голоса
-    if not option_ids:
-        # Пользователь отозвал голос
-        vote = VoteStatus.NO
-    elif option_ids[0] == 0:
-        vote = VoteStatus.YES
-    elif option_ids[0] == 1:
-        vote = VoteStatus.MAYBE
-    else:
-        vote = VoteStatus.NO
-
-    # Создать профиль кандидата если нет
-    user = poll_answer.user
-    await candidate_service.get_or_create_candidate(
-        user_id=user.id,
-        first_name=user.first_name or "—",
-        last_name=user.last_name,
-        username=user.username,
-    )
-
-    # Только фиксируем интерес, не регистрируем в event_candidates автоматически
-    await candidate_service.record_poll_interest(event.event_id, user_id)
-    logger.info(f"Голос сохранён: user={user_id}, event={event.event_id}, vote={vote}")
+    await update.effective_message.reply_text(f"✅ Опрос для мероприятия {event_id} закрыт.")

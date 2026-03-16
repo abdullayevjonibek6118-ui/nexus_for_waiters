@@ -199,17 +199,7 @@ async def get_applicants(
         db = get_db()
         query = (
             db.table("event_candidates")
-            .select("""
-                application_status,
-                role,
-                arrival_time,
-                departure_time,
-                user_id,
-                candidates (
-                    first_name, last_name, full_name,
-                    phone_number, telegram_username, gender
-                )
-            """)
+            .select("application_status,role,arrival_time,departure_time,user_id,candidates(first_name,last_name,full_name,phone_number,telegram_username,gender,primary_role)")
             .eq("event_id", event_id)
         )
         
@@ -261,6 +251,39 @@ async def set_arrival_departure(event_id: str, user_id: int,
     except Exception as e:
         logger.error(f"Ошибка установки времени для {user_id}: {e}")
         raise DatabaseError(f"Ошибка установки времени: {e}")
+
+
+async def select_candidate(event_id: str, user_id: int, selected: bool) -> bool:
+    """Установить статус 'Выбран' через transition_application."""
+    target = ApplicationStatus.ACCEPTED if selected else ApplicationStatus.REJECTED
+    try:
+        from services.candidate_service import transition_application
+        return await transition_application(event_id, user_id, target)
+    except Exception:
+        # Fallback на старую логику если переход невозможен (для совместимости)
+        db = get_db()
+        db.table("event_candidates").update({"selected": selected}).eq("event_id", event_id).eq("user_id", user_id).execute()
+        return True
+
+async def get_voters(event_id: str) -> list:
+    """Прослойка для обратной совместимости."""
+    return await get_applicants(event_id)
+
+async def get_selected_candidates(event_id: str) -> list:
+    """Прослойка для обратной совместимости (только принятые)."""
+    return await get_applicants(event_id, status=ApplicationStatus.ACCEPTED)
+
+async def confirm_checkin(event_id: str, user_id: int) -> bool:
+    """Подтвердить приход кандидата."""
+    try:
+        db = get_db()
+        db.table("event_candidates").update({
+            "is_checkin_confirmed": True
+        }).eq("event_id", event_id).eq("user_id", user_id).execute()
+        return True
+    except Exception as e:
+        logger.error(f"Error confirm_checkin {user_id}: {e}")
+        return False
 
 
 

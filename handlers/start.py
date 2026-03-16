@@ -67,7 +67,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             # Если начал регистрацию, но не закончил выбор пола
             await update.message.reply_html(
                 "Пожалуйста, <b>выберите ваш пол</b> для завершения регистрации:",
-                reply_markup=get_gender_keyboard()
+                reply_markup=get_gender_inline_keyboard()
             )
             return
 

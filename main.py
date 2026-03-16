@@ -135,7 +135,7 @@ def main() -> None:
     app.add_handler(get_super_admin_handler()) # ConversationHandler для создания компаний
 
     # ── Callback-кнопки ─────────────────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^(confirm|inv)_(yes|no):"))
+    app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^inv_(yes|no):"))
     app.add_handler(CallbackQueryHandler(
         handle_event_action_callback,
         pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel|ev_[a-zA-Z0-9_]+)(:|$)"

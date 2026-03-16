@@ -6,9 +6,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from config import settings
-from models.event import EventStatus
-from services import event_service, candidate_service, audit_service, recruiter_service
-from utils.constants import ApplicationStatus
+from utils.constants import ApplicationStatus, EventStatus
 from utils.keyboards import (
     get_candidate_select_keyboard, 
     get_confirm_keyboard, 
@@ -100,7 +98,7 @@ async def _render_card(update: Update, context: ContextTypes.DEFAULT_TYPE, event
     uid = v_data["user_id"]
     cand_profile = v_data.get("candidates", {})
     
-    fullname = cand_profile.get("full_name") or cand_profile.get("first_name", "Неизвестно")
+    fullname = (cand_profile.get("full_name") or cand_profile.get("first_name")) or "Неизвестно"
     gender_raw = cand_profile.get("gender")
     gender_icon = "👨" if gender_raw == "Male" else "👩" if gender_raw == "Female" else "🧑"
     
@@ -118,7 +116,7 @@ async def _render_card(update: Update, context: ContextTypes.DEFAULT_TYPE, event
         f"🔗 <b>Профиль:</b> {username_str}\n"
         f"{gender_icon} <b>Пол:</b> {'Мужской' if gender_raw == 'Male' else 'Женский' if gender_raw == 'Female' else 'Не указан'}\n"
         f"🎭 <b>Роль:</b> {cand_profile.get('primary_role') or 'Не указана'}\n"
-        f"⏰ <b>Удобное время:</b> {v_data.get('arrival_time', 'Не указано')}\n"
+        f"⏰ <b>Удобное время:</b> {v_data.get('arrival_time') or 'Не указано'}\n"
         f"📱 <b>Телефон:</b> <code>{cand_profile.get('phone_number') or 'Не указан'}</code>\n\n"
         "✨ <i>Примите решение по кандидату:</i>"
     )
@@ -150,14 +148,23 @@ async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
     uid = state["data"][state["index"]]["user_id"]
 
     if "✅ Принять" in text:
-        await candidate_service.transition_application(event_id, uid, ApplicationStatus.ACCEPTED)
-        await update.message.reply_text(f"✅ Кандидат принят.")
-        state["index"] += 1 # Added this line to advance to the next card after accepting
-        await _render_card(update, context, event_id, state["index"]) # Added this line to render the next card
+        try:
+            await candidate_service.transition_application(event_id, uid, ApplicationStatus.ACCEPTED)
+            await update.message.reply_text(f"✅ Кандидат принят.")
+        except Exception as e:
+            logger.warning(f"Transition to ACCEPTED failed: {e}")
+        
+        state["index"] += 1
+        await _render_card(update, context, event_id, state["index"])
+        
     elif "❌ Отклонить" in text:
-        await candidate_service.transition_application(event_id, uid, ApplicationStatus.REJECTED)
-        await update.message.reply_text(f"❌ Кандидат отклонен.")
-        state["index"] += 1 # Added this line to advance to the next card after rejecting
+        try:
+            await candidate_service.transition_application(event_id, uid, ApplicationStatus.REJECTED)
+            await update.message.reply_text(f"❌ Кандидат отклонен.")
+        except Exception as e:
+            logger.warning(f"Transition to REJECTED failed: {e}")
+
+        state["index"] += 1
         await _render_card(update, context, event_id, state["index"])
     elif text == "➡️ Следующий":
         state["index"] += 1
@@ -181,13 +188,21 @@ async def handle_card_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if current_index >= len(state.get("data", [])): return
 
     if action == "card_accept":
-        uid = int(parts[2])
+        try:
+            uid = int(parts[2])
+        except (ValueError, IndexError):
+            await query.answer("Ошибка данных: ID не число")
+            return
         await candidate_service.select_candidate(event_id, uid, True)
         state["index"] += 1
         await _render_card(update, context, event_id, state["index"])
         
     elif action == "card_reject":
-        uid = int(parts[2])
+        try:
+            uid = int(parts[2])
+        except (ValueError, IndexError):
+            await query.answer("Ошибка данных: ID не число")
+            return
         await candidate_service.select_candidate(event_id, uid, False)
         state["index"] += 1
         await _render_card(update, context, event_id, state["index"])

@@ -338,7 +338,7 @@ async def handle_recruiter_menu(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def handle_event_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик выбора конкретного мероприятия из списка (Reply-кнопки)."""
+    """Обработка выбора конкретного мероприятия из списка (Reply)."""
     text = update.message.text
     ev_list = context.user_data.get("ev_list", {})
     
@@ -346,7 +346,13 @@ async def handle_event_selection(update: Update, context: ContextTypes.DEFAULT_T
         event_id = ev_list[text]
         await show_event_management_menu(update, context, event_id)
     elif text == "⬅️ Назад в меню":
-        await events_dashboard(update, context)
+        from handlers.start import start_command # Избегаем циклического импорта
+        await start_command(update, context)
+    elif text.startswith("📅"):
+        # Если текст начинается с даты, но его нет в ev_list — сессия сброшена
+        await update.message.reply_html(
+            "⚠️ <b>Сессия сброшена.</b>\nПожалуйста, обновите список мероприятий через команду /list_events или кнопку «📋 Мои мероприятия»."
+        )
 
 
 async def show_event_management_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str) -> None:

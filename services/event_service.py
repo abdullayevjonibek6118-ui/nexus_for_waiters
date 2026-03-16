@@ -6,7 +6,8 @@ import uuid
 import logging
 from typing import Optional, List
 from database import get_db
-from models.event import Event, EventStatus
+from models.event import Event
+from utils.constants import EventStatus
 from utils.exceptions import EventNotFoundError, DatabaseError
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ async def create_event(event: Event) -> Event:
             "title": event.title,
             "date": event.date,
             "location": event.location,
+            "payment": event.payment,
             "max_candidates": event.max_candidates,
             "required_roles": event.required_roles,
             "arrival_times": event.arrival_times,
@@ -55,22 +57,25 @@ async def get_event(event_id: str) -> Event:
         raise DatabaseError(f"Ошибка базы данных при получении мероприятия: {e}")
 
 
-async def get_active_events(company_id: str) -> List[Event]:
+async def get_active_events(company_id: Optional[str] = None) -> List[Event]:
     """
-    Получить список незакрытых мероприятий конкретной компании.
-    company_id теперь обязателен для обеспечения изоляции данных.
+    Получить список незакрытых мероприятий.
+    Если company_id указан — фильтрует по нему (изоляция).
+    Если не указан (для планировщика) — возвращает все активные.
     """
     try:
         db = get_db()
-        result = (
+        query = (
             db.table("events")
             .select("*")
-            .eq("company_id", company_id)
             .neq("status", EventStatus.CLOSED.value)
             .neq("status", EventStatus.COMPLETED.value)
             .order("date")
-            .execute()
         )
+        if company_id:
+            query = query.eq("company_id", company_id)
+            
+        result = query.execute()
         
         events = []
         for row in (result.data or []):
@@ -81,7 +86,7 @@ async def get_active_events(company_id: str) -> List[Event]:
                 
         return events
     except Exception as e:
-        logger.error(f"Ошибка получения мероприятий для компании {company_id}: {e}")
+        logger.error(f"Ошибка получения мероприятий (company={company_id}): {e}")
         return []
 
 

@@ -9,9 +9,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, ApplicationBuilder
 from telegram.constants import ParseMode
 from config import settings
-from models.event import EventStatus
-from services import event_service, candidate_service, audit_service, sheets_service, scheduler_service, excel_service, recruiter_service
-from utils.constants import ApplicationStatus
+from utils.constants import ApplicationStatus, EventStatus
 
 logger = logging.getLogger(__name__)
 
@@ -140,8 +138,7 @@ async def payment_confirmed_cmd(update: Update, context: ContextTypes.DEFAULT_TY
 
     job_id = f"payment_reminder_{event_id}"
     scheduler_service.cancel_reminder(job_id)
-
-    await event_service.update_event_status(event_id, EventStatus.COMPLETED)
+    await event_service.update_event_status(event_id, EventStatus.SELECTION_COMPLETED)
     await audit_service.log_action(
         event_id, "payment_confirmed", update.effective_user.id, {}
     )
