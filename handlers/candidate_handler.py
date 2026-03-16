@@ -16,6 +16,7 @@ from utils.keyboards import (
     get_checkin_keyboard
 )
 from utils.validators import validate_time_format
+from services import event_service, candidate_service, audit_service, recruiter_service
 
 logger = logging.getLogger(__name__)
 
