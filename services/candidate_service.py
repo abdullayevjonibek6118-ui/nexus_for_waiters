@@ -184,19 +184,7 @@ async def update_candidate_gender(user_id: int, gender: str) -> bool:
         logger.error(f"Ошибка сохранения пола кандидата {user_id}: {e}")
         raise DatabaseError(f"Ошибка сохранения пола: {e}")
 
-async def save_vote(event_id: str, user_id: int, vote_status: VoteStatus) -> bool:
-    """Сохранить голос кандидата за мероприятие (используя upsert для атомарности)."""
-    try:
-        db = get_db()
-        db.table("event_candidates").upsert({
-            "event_id": event_id,
-            "user_id": user_id,
-            "vote_status": vote_status.value,
-        }).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка сохранения голоса: {e}")
-        raise DatabaseError(f"Ошибка сохранения голоса в БД: {e}")
+
 
 
 async def get_applicants(
@@ -258,17 +246,7 @@ async def get_event_candidate(event_id: str, user_id: int) -> dict:
 
 
 
-async def reset_event_selections(event_id: str) -> bool:
-    """Сбросить статус `selected` для всех кандидатов мероприятия."""
-    try:
-        db = get_db()
-        db.table("event_candidates").update(
-            {"selected": False}
-        ).eq("event_id", event_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка сброса выбора кандидатов для {event_id}: {e}")
-        raise DatabaseError(f"Ошибка сброса выбора: {e}")
+
 
 
 
@@ -327,44 +305,4 @@ async def update_candidate_role(user_id: int, role: str) -> bool:
         logger.error(f"Ошибка обновления роли для {user_id}: {e}")
         return False
 
-async def register_for_event(event_id: str, user_id: int, role: str, arrival_time: str) -> bool:
-    """Зарегистрировать кандидата на конкретное мероприятие."""
-    try:
-        db = get_db()
-        # Сохраняем заголосование и выбранное время в связующую таблицу
-        db.table("event_candidates").upsert({
-            "event_id": event_id,
-            "user_id": user_id,
-            "vote_status": "yes",
-            "arrival_time": arrival_time,
-            "selected": False,  # Рекрутер должен будет подтвердить
-        }).execute()
-        
-        # BUG-7 FIX: Всегда обновляем роль кандидата (не только если пуста)
-        if role:
-            await update_candidate_role(user_id, role)
-            
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка регистрации на мероприятие: {e}")
-        return False
 
-async def mark_checked_in(event_id: str, user_id: int) -> bool:
-    """Кандидат отметил, что пришел."""
-    try:
-        db = get_db()
-        db.table("event_candidates").update({"is_checked_in": True}).eq("event_id", event_id).eq("user_id", user_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка mark_checked_in: {e}")
-        return False
-
-async def confirm_checkin(event_id: str, user_id: int) -> bool:
-    """Рекрутер подтвердил приход."""
-    try:
-        db = get_db()
-        db.table("event_candidates").update({"is_checkin_confirmed": True}).eq("event_id", event_id).eq("user_id", user_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Ошибка confirm_checkin: {e}")
-        return False

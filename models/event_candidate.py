@@ -7,7 +7,7 @@ from utils.constants import VoteStatus, ApplicationStatus
 # Разрешённые переходы между статусами заявки.
 ALLOWED_TRANSITIONS: dict[ApplicationStatus, set[ApplicationStatus]] = {
     ApplicationStatus.PENDING:    {ApplicationStatus.ACCEPTED, ApplicationStatus.REJECTED},
-    ApplicationStatus.ACCEPTED:   {ApplicationStatus.SCHEDULED, ApplicationStatus.REJECTED},
+    ApplicationStatus.ACCEPTED:   {ApplicationStatus.SCHEDULED, ApplicationStatus.INVITED, ApplicationStatus.REJECTED},
     ApplicationStatus.SCHEDULED:  {ApplicationStatus.INVITED, ApplicationStatus.REJECTED},
     ApplicationStatus.INVITED:    {ApplicationStatus.CONFIRMED, ApplicationStatus.DECLINED},
     ApplicationStatus.CONFIRMED:  {ApplicationStatus.CHECKED_IN, ApplicationStatus.DECLINED},

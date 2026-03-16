@@ -109,25 +109,25 @@ async def schedule_daily_reminders(bot):
                     continue
 
             if ev.date == tomorrow:
-                # Нашли мероприятие на завтра, берём подтвержденных кандидатов
-                selected = await candidate_service.get_selected_candidates(ev.event_id)
+                # Нашли мероприятие на завтра, берём подтвержденных кандидатов (Шаг 6)
+                from models.event_candidate import ApplicationStatus
+                selected = await candidate_service.get_applicants(ev.event_id, status=ApplicationStatus.CONFIRMED)
                 count = 0
                 for c in selected:
-                    if c.get("confirmed"):
-                        user_id = c.get("user_id")
-                        arrival = c.get("arrival_time", "—")
-                        text = (
-                            f"🔔 <b>Напоминание о мероприятии ЗАВТРА!</b>\n\n"
-                            f"📌 <b>{ev.title}</b>\n"
-                            f"📍 Место: {ev.location}\n"
-                            f"⏰ Время прихода: {arrival}\n\n"
-                            f"Ждём вас!"
-                        )
-                        try:
-                            await bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
-                            count += 1
-                        except Exception as e:
-                            logger.error(f"Ошибка отправки напоминания {user_id}: {e}")
+                    user_id = c.get("user_id")
+                    arrival = c.get("arrival_time", "—")
+                    text = (
+                        f"🔔 <b>Напоминание о мероприятии ЗАВТРА!</b>\n\n"
+                        f"📌 <b>{ev.title}</b>\n"
+                        f"📍 Место: {ev.location}\n"
+                        f"⏰ Время прихода: {arrival}\n\n"
+                        f"Ждём вас!"
+                    )
+                    try:
+                        await bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
+                        count += 1
+                    except Exception as e:
+                        logger.error(f"Ошибка отправки напоминания {user_id}: {e}")
                 logger.info(f"Напоминания отправлены {count} кандидатам для {ev.title} ({ev.event_id})")
 
     # Запуск каждый день в 18:00 по времени бота

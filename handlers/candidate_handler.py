@@ -279,7 +279,7 @@ async def set_times_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     # Показать список выбранных кандидатов
-    selected = await candidate_service.get_selected_candidates(event_id)
+    selected = await candidate_service.get_applicants(event_id, status=ApplicationStatus.ACCEPTED)
     if not selected:
         await update.effective_message.reply_text("❌ Нет выбранных кандидатов.")
         return
@@ -347,7 +347,7 @@ async def handle_time_message_input(update: Update, context: ContextTypes.DEFAUL
     event_id = state["event_id"]
     
     if state["mode"] == "all":
-        selected = await candidate_service.get_selected_candidates(event_id)
+        selected = await candidate_service.get_applicants(event_id, status=ApplicationStatus.ACCEPTED)
         for c in selected:
             await candidate_service.set_arrival_departure(event_id, c["user_id"], arrival, departure)
         await update.message.reply_html(f"✅ Время <b>{arrival} – {departure}</b> назначено <b>всем</b> кандидатам!")
@@ -380,9 +380,9 @@ async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TY
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
 
-    selected = await candidate_service.get_selected_candidates(event_id)
+    selected = await candidate_service.get_applicants(event_id, status=ApplicationStatus.ACCEPTED)
     if not selected:
-        await update.effective_message.reply_text("❌ Нет выбранных кандидатов.")
+        await update.effective_message.reply_text("❌ Нет одобренных кандидатов для уведомления.")
         return
 
     sent, failed = 0, 0
@@ -406,6 +406,8 @@ async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TY
                 chat_id=user_id, text=msg, parse_mode="HTML",
                 reply_markup=get_invitation_keyboard(event_id),
             )
+            # Переводим в статус INVITED (Шаг 5)
+            await candidate_service.transition_application(event_id, user_id, ApplicationStatus.INVITED)
             sent += 1
         except Exception as e:
             logger.warning(f"Не удалось отправить сообщение {user_id}: {e}")
