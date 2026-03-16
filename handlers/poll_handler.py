@@ -60,12 +60,16 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         # Получаем компанию рекрутера для Chat ID
         rec_profile = await recruiter_service.get_recruiter(update.effective_user.id)
-        group_chat_id = (rec_profile or {}).get("companies", {}).get("group_chat_id")
-        if not group_chat_id:
+        group_chat_id = None
+        if rec_profile and rec_profile.get("companies"):
+            group_chat_id = rec_profile["companies"].get("group_chat_id")
+        
+        # Если в компании не настроено, берем из конфига
+        if not group_chat_id or group_chat_id == 0:
             group_chat_id = settings.group_chat_id
 
         if not group_chat_id or group_chat_id == 0:
-            await update.effective_message.reply_text("⚠️ ID группы не настроен для вашей компании.")
+            await update.effective_message.reply_text("⚠️ ID группы не настроен. Пожалуйста, укажите GROUP_CHAT_ID в .env или в настройках компании.")
             return
 
         bot_username = (await context.bot.get_me()).username

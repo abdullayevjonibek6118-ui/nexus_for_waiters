@@ -316,6 +316,29 @@ async def update_candidate_full_name(user_id: int, full_name: str) -> bool:
         logger.error(f"Ошибка обновления ФИО для {user_id}: {e}")
         raise DatabaseError(f"Ошибка обновления ФИО: {e}")
 
+async def get_company_applicants(company_id: str) -> list:
+    """Получить всех кандидатов для всех мероприятий компании."""
+    try:
+        db = get_db()
+        # Получаем все мероприятия компании
+        events_res = db.table("events").select("event_id").eq("company_id", company_id).execute()
+        event_ids = [e["event_id"] for e in events_res.data]
+        
+        if not event_ids:
+            return []
+            
+        # Получаем всех кандидатов для этих мероприятий с данными профилей и мероприятий
+        result = (
+            db.table("event_candidates")
+            .select("*, candidates(*), events(*)")
+            .in_("event_id", event_ids)
+            .execute()
+        )
+        return result.data
+    except Exception as e:
+        logger.error(f"Ошибка get_company_applicants: {e}")
+        return []
+
 async def update_candidate_role(user_id: int, role: str) -> bool:
     """Обновить роль кандидата."""
     try:

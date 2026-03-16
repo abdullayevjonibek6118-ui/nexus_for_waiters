@@ -138,7 +138,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^inv_(yes|no):"))
     app.add_handler(CallbackQueryHandler(
         handle_event_action_callback,
-        pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel|ev_[a-zA-Z0-9_]+)(:|$)"
+        pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel|export_company_report|ev_[a-zA-Z0-9_]+)(:|$)"
     ))
     app.add_handler(CallbackQueryHandler(handle_card_callback, pattern=r"^card_(accept|reject|next)"))
     app.add_handler(CallbackQueryHandler(handle_checkin, pattern=r"^checkin_"))
@@ -166,7 +166,7 @@ def main() -> None:
     ), group=0)
     
     app.add_handler(MessageHandler(
-        filters.Regex(r"^(📢 Опубликовать|👥 Карточки|✉️ Уведомить|📄 Экспорт Excel|⏰ Назначить время|🤖 Автоотбор|📊 Логи|❌ Архивировать|⬅️ К списку мероприятий)"),
+        filters.Regex(r"^(📢 Опубликовать|👥 Карточки|✉️ Уведомить|📄 Экспорт Excel|⏰ Назначить время|🤖 Автоотбор|📊 Логи|❌ Архивировать|⬅️ К списку)"),
         handle_event_menu_action
     ), group=0)
 

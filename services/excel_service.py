@@ -130,3 +130,53 @@ def generate_event_xlsx(event_title: str, event_date: str, event_location: str, 
     filepath = os.path.join(os.getcwd(), filename)
     wb.save(filepath)
     return filepath
+
+def generate_company_report_xlsx(company_name: str, candidates: list) -> str:
+    """
+    Генерирует общий отчет по всем мероприятиям компании.
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Общий отчет"
+
+    ws.merge_cells("A1:J1")
+    ws["A1"] = f"Общий отчет по компании: {company_name}"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A1"].alignment = Alignment(horizontal="center")
+
+    headers = ["Проект", "Дата", "ФИО", "Пол", "Телефон", "TG Username", "Роль", "Приход", "Уход", "Отработано (ч)"]
+    ws.append(headers)
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    
+    for cell in ws[2]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    for c in candidates:
+        profile = c.get("candidates", {}) or {}
+        event = c.get("events", {}) or {} # Assuming we join events
+        
+        full_name = profile.get("full_name") or f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+        role = c.get("role", profile.get("primary_role", "—"))
+        
+        ws.append([
+            sanitize_for_excel(event.get("title", "—")),
+            sanitize_for_excel(event.get("date", "—")),
+            sanitize_for_excel(full_name),
+            sanitize_for_excel(profile.get("gender", "—")),
+            sanitize_for_excel(profile.get("phone_number", "—")),
+            sanitize_for_excel(profile.get("telegram_username", "—")),
+            sanitize_for_excel(role),
+            c.get("arrival_time") or "—",
+            c.get("departure_time") or "—",
+            "—" # Calculation logic can be added if needed
+        ])
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"company_report_{timestamp}.xlsx"
+    filepath = os.path.join(os.getcwd(), filename)
+    wb.save(filepath)
+    return filepath

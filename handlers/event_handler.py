@@ -3,7 +3,7 @@ Nexus AI — Handler: Создание мероприятий (ConversationHandl
 Команды: /create_event, /list_events
 """
 import logging
-from telegram import Update, ForceReply
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
@@ -330,9 +330,14 @@ async def handle_recruiter_menu(update: Update, context: ContextTypes.DEFAULT_TY
             "📊 <b>Статистика и отчеты</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📅 <b>Активных проектов (мероприятий):</b> {len(events)}\n\n"
-            "<i>💡 Чтобы получить отчет, выберите мероприятие в списке и нажмите «📄 Экспорт Excel».</i>"
+            "<i>💡 Вы можете выгрузить отчет по конкретному мероприятию (выбрав его в списке) "
+            "или скачать <b>общий отчет</b> по всем вашим проектам:</i>"
         )
-        await update.message.reply_html(report_text)
+        keyboard = [[InlineKeyboardButton("📄 Скачать общий отчет (XLSX)", callback_data="export_company_report")]]
+        await update.message.reply_html(
+            report_text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     elif text == "❓ Помощь":
         await update.message.reply_html("ℹ️ <b>Справка:</b>\n\nИспользуйте кнопки меню для управления проектами.")
 
@@ -382,7 +387,7 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
     text = update.message.text
     event_id = context.user_data.get("selected_event_id")
     
-    if not event_id and text != "⬅️ К списку мероприятий":
+    if not event_id and text not in ["⬅️ К списку мероприятий", "⬅️ К списку"]:
         await update.message.reply_html(
             "⚠️ <b>Сессия истекла или бот был перезагружен.</b>\n\n"
             "Пожалуйста, выберите мероприятие заново из списка через /events."
@@ -473,6 +478,45 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
 
     if data == "ev_active":
         await list_events(update, context)
+        return
+
+    if data == "export_company_report":
+        user_id = update.effective_user.id
+        rec_profile = await recruiter_service.get_recruiter(user_id)
+        if not rec_profile:
+            await query.message.reply_text("⛔ Ошибка: Профиль рекрутера не найден.")
+            return
+        
+        company_id = rec_profile.get("company_id")
+        company_name = rec_profile.get("companies", {}).get("name") if rec_profile.get("companies") else "Моя компания"
+        
+        await query.message.reply_text("⏳ Формирую общий отчет по всем мероприятиям...")
+        
+        from services import candidate_service, excel_service
+        import os
+        import asyncio
+        
+        candidates = await candidate_service.get_company_applicants(company_id)
+        if not candidates:
+            await query.message.reply_text("❌ Нет данных для отчета.")
+            return
+            
+        try:
+            filepath = await asyncio.to_thread(
+                excel_service.generate_company_report_xlsx,
+                company_name=company_name,
+                candidates=candidates
+            )
+            with open(filepath, "rb") as f:
+                await context.bot.send_document(
+                    chat_id=update.effective_chat.id,
+                    document=f,
+                    filename=os.path.basename(filepath),
+                    caption=f"📊 Общий отчет: {company_name}"
+                )
+        except Exception as e:
+            logger.error(f"Error generating company report: {e}")
+            await query.message.reply_text(f"❌ Ошибка при генерации отчета: {e}")
         return
 
     if data == "ev_reports":

@@ -250,7 +250,11 @@ async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     selected = await candidate_service.get_selected_candidates(event_id)
     if not selected:
-        await update.effective_message.reply_text("❌ Нет данных для выгрузки (никто не выбран).")
+        logger.info(f"No selected candidates for {event_id}, trying all applicants.")
+        selected = await candidate_service.get_applicants(event_id)
+        
+    if not selected:
+        await update.effective_message.reply_text("❌ Нет данных для выгрузки (никто не подавал заявку).")
         return
 
     await update.effective_message.reply_text("⏳ Генерирую Excel файл...")
