@@ -134,15 +134,19 @@ async def handle_ob_confirm_action(update: Update, context: ContextTypes.DEFAULT
     """Обработчик финального выбора: Подтвердить или Изменить."""
     action_text = update.message.text.strip()
     
+    logger.debug(f"Onboarding confirm action: '{action_text}'")
+    
     if action_text == "✅ Подтвердить":
         return await handle_ob_confirm(update, context)
     elif action_text == "✏️ Изменить":
         return await handle_ob_edit(update, context)
     else:
+        logger.warning(f"Unknown onboarding action: '{action_text}'")
         return CONFIRM_DATA
 
 async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Подтверждение (Этап 8)."""
+    logger.info(f"User {update.effective_user.id} confirming onboarding")
     event_id = context.user_data.get("ob_event_id")
     user = update.effective_user
     user_id = user.id
@@ -218,5 +222,5 @@ def get_onboarding_handler():
         fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
         allow_reentry=True,
         name="candidate_onboarding",
-        persistent=False
+        persistent=True
     )
