@@ -220,7 +220,7 @@ def get_event_post_creation_keyboard():
     keyboard = [
         ["📢 Опубликовать", "👥 Карточки"],
         ["✉️ Уведомить", "📄 Экспорт Excel"],
-        ["🤖 Автоотбор", "⬅️ К списку"]
+        ["🤖 Автоотбор", "⬅️ К списку мероприятий"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 

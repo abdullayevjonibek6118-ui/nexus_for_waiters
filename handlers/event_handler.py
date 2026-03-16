@@ -428,7 +428,7 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
         context.args = [event_id]
         await close_event_cmd(update, context)
 
-    elif text == "⬅️ К списку мероприятий":
+    elif text in ["⬅️ К списку мероприятий", "⬅️ К списку"]:
         await list_events(update, context)
 
 

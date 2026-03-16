@@ -10,6 +10,15 @@ from telegram.ext import ContextTypes, ApplicationBuilder
 from telegram.constants import ParseMode
 from config import settings
 from utils.constants import ApplicationStatus, EventStatus
+from services import (
+    event_service, 
+    candidate_service, 
+    sheets_service, 
+    audit_service, 
+    scheduler_service, 
+    recruiter_service,
+    excel_service
+)
 
 logger = logging.getLogger(__name__)
 
