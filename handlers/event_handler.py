@@ -21,7 +21,7 @@ from utils.validators import validate_date_format, validate_max_candidates
 logger = logging.getLogger(__name__)
 
 # Состояния ConversationHandler
-E_TITLE, E_DATE, E_LOC, E_PAYMENT, E_MAX, E_GENDERS, E_ROLES, E_TIMES = range(8)
+E_TITLE, E_DATE, E_LOC, E_PAYMENT, E_MAX, E_GENDERS, E_ROLES, E_TIMES, E_END_TIME = range(9)
 
 
 
@@ -202,10 +202,8 @@ async def handle_ev_genders(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_html("🎭 <b>Шаг 7 из 8: Роли</b>\n\nКакие роли нужны? (через запятую)\n<i>Пример: Промоутер, Хостес, Регистратор</i>")
     return E_ROLES
 
-async def handle_ev_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    roles = [r.strip() for r in update.message.text.split(",")]
     context.user_data["ev_roles"] = roles
-    await update.message.reply_html("⏰ <b>Шаг 8 из 8: Времена прихода</b>\n\nВведите доступные времена через запятую:\n<i>Пример: 08:00, 09:00, 10:00</i>")
+    await update.message.reply_html("⏰ <b>Шаг 8 из 9: Времена прихода</b>\n\nВведите доступные времена через запятую:\n<i>Пример: 08:00, 09:00, 10:00</i>")
     return E_TIMES
 
 async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -224,6 +222,21 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return E_TIMES
 
     context.user_data["ev_times"] = times
+    await update.message.reply_html("🏁 <b>Шаг 9 из 9: Время завершения</b>\n\nКогда мероприятие заканчивается?\n<i>Пример: 18:00, 22:30</i>")
+    return E_END_TIME
+
+async def handle_ev_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    from utils.validators import validate_time_format
+    
+    end_time = update.message.text.strip()
+    if not validate_time_format(end_time):
+        await update.message.reply_html(
+            f"❌ <b>Неверный формат времени:</b> <code>{end_time}</code>\n\n"
+            "Пожалуйста, используйте формат <code>HH:MM</code> (например: <code>18:00</code>)."
+        )
+        return E_END_TIME
+
+    context.user_data["ev_end_time"] = end_time
     
     user = update.effective_user
     rec_profile = await recruiter_service.get_recruiter(user.id)
@@ -237,6 +250,7 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         max_candidates=context.user_data["ev_max"],
         required_roles=context.user_data["ev_roles"],
         arrival_times=context.user_data["ev_times"],
+        end_time=context.user_data["ev_end_time"],
         required_men=context.user_data.get("ev_men", 0),
         required_women=context.user_data.get("ev_women", 0),
         company_id=company_id,
@@ -263,7 +277,8 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"💰 <b>Оплата:</b> {saved.payment}\n"
             f"👥 <b>Лимит:</b> {saved.max_candidates} чел.{gender_req}\n"
             f"🎭 <b>Роли:</b> {roles_str}\n"
-            f"⏰ <b>Времена:</b> {times_str}\n\n"
+            f"⏰ <b>Начало:</b> {times_str}\n"
+            f"🏁 <b>Конец:</b> {saved.end_time}\n\n"
             "<i>Что делаем дальше?</i>"
         )
         await update.message.reply_html(
@@ -376,6 +391,7 @@ async def show_event_management_menu(update: Update, context: ContextTypes.DEFAU
         f"📅 <b>Дата:</b> {event.date}\n"
         f"📍 <b>Место:</b> {event.location}\n"
         f"👥 <b>Лимит:</b> {event.max_candidates}\n"
+        f"⏰ <b>Конец:</b> {event.end_time or '—'}\n"
         f"📊 <b>Статус:</b> {event.status.value}\n\n"
         "<i>Выберите действие для этого мероприятия:</i>"
     )
@@ -455,6 +471,7 @@ def get_create_event_handler() -> ConversationHandler:
             E_GENDERS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_genders)],
             E_ROLES: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_roles)],
             E_TIMES: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_times)],
+            E_END_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ev_end_time)],
         },
         fallbacks=[CommandHandler("cancel", cancel_conversation)],
         allow_reentry=True,

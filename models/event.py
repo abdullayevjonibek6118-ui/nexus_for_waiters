@@ -21,6 +21,7 @@ class Event(BaseModel):
     sheet_url: Optional[str] = None
     required_roles: list[str] = []
     arrival_times: list[str] = []
+    end_time: Optional[str] = None
     required_men: int = 0
     required_women: int = 0
     created_by: Optional[int] = None   # Telegram user_id рекрутера

@@ -27,6 +27,7 @@ async def create_event(event: Event) -> Event:
             "max_candidates": event.max_candidates,
             "required_roles": event.required_roles,
             "arrival_times": event.arrival_times,
+            "end_time": event.end_time,
             "required_men": event.required_men,
             "required_women": event.required_women,
             "status": event.status.value,

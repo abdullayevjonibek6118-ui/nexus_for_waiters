@@ -112,6 +112,10 @@ async def handle_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     full_name = context.user_data.get("ob_full_name")
     role = context.user_data.get("ob_role")
     phone = context.user_data.get("ob_phone")
+
+    event_id = context.user_data.get("ob_event_id")
+    event = await event_service.get_event(event_id)
+    end_time_str = f" — {event.end_time}" if event.end_time else ""
     
     text = (
         "🏁 <b>Почти готово! Проверьте данные:</b>\n"
@@ -119,7 +123,7 @@ async def handle_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"👤 <b>ФИО:</b> {full_name}\n"
         f"🎭 <b>Роль:</b> {role}\n"
         f"📱 <b>Тел:</b> {phone}\n"
-        f"⏰ <b>Время:</b> {time}\n\n"
+        f"⏰ <b>Время:</b> {time}{end_time_str}\n\n"
         "<i>Если всё верно, нажмите «Подтвердить».</i>"
     )
     
@@ -164,11 +168,13 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await candidate_service.update_candidate_gender(user_id, gender)
     
     # Регистрируем на ивент (через новую функцию)
+    event = await event_service.get_event(event_id)
     await candidate_service.apply_for_event(
         event_id=event_id,
         user_id=user_id,
         role=role,
-        arrival_time=context.user_data.get("ob_time")
+        arrival_time=context.user_data.get("ob_time"),
+        departure_time=event.end_time
     )
     
     # BUG-07: Премиум сообщение подтверждения

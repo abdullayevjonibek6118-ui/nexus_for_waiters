@@ -35,6 +35,7 @@ async def apply_for_event(
     user_id: int,
     role: str,
     arrival_time: str,
+    departure_time: Optional[str] = None
 ) -> bool:
     """
     Регистрирует кандидата на мероприятие через онбординг.
@@ -49,6 +50,7 @@ async def apply_for_event(
                 "application_status": ApplicationStatus.PENDING.value,
                 "role": role,
                 "arrival_time": arrival_time,
+                "departure_time": departure_time,
                 # Старые поля для обратной совместимости
                 "vote_status": VoteStatus.YES.value,
                 "selected": False,
