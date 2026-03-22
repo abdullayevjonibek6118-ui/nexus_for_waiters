@@ -201,7 +201,8 @@ async def handle_ev_genders(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     await update.message.reply_html("🎭 <b>Шаг 7 из 8: Роли</b>\n\nКакие роли нужны? (через запятую)\n<i>Пример: Промоутер, Хостес, Регистратор</i>")
     return E_ROLES
-
+async def handle_ev_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    roles = [r.strip() for r in update.message.text.split(",")]
     context.user_data["ev_roles"] = roles
     await update.message.reply_html("⏰ <b>Шаг 8 из 9: Времена прихода</b>\n\nВведите доступные времена через запятую:\n<i>Пример: 08:00, 09:00, 10:00</i>")
     return E_TIMES
