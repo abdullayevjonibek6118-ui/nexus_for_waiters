@@ -21,7 +21,36 @@ WAIT_REG_START, CHOOSE_ROLE, SHARE_PHONE, INPUT_NAME, CHOOSE_GENDER, CHOOSE_TIME
 async def start_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, event_id: str):
     """Начало онбординга (Этап 2)."""
     context.user_data["ob_event_id"] = event_id
-    
+    user = update.effective_user
+    user_id = user.id
+
+    # Проверяем, есть ли у пользователя уже заполненный профиль
+    existing_profile = await candidate_service.get_candidate_profile(user_id)
+
+    if existing_profile and existing_profile.gender and existing_profile.phone_number:
+        # Профиль полностью заполнен — пропускаем шаги и сразу показываем выбор роли
+        context.user_data["ob_has_profile"] = True
+        context.user_data["ob_full_name"] = existing_profile.full_name
+        context.user_data["ob_phone"] = existing_profile.phone_number
+        context.user_data["ob_gender"] = existing_profile.gender
+
+        event = await event_service.get_event(event_id)
+        roles = event.required_roles or ["Промоутер", "Хостес", "Регистратор"]
+
+        from utils.keyboards import get_onboarding_role_reply_keyboard
+        text = (
+            f"👋 <b>С возвращением, {existing_profile.full_name or user.first_name}!</b>\n\n"
+            "Ваш профиль уже сохранён. Осталось только выбрать роль для этого мероприятия."
+        )
+        await update.message.reply_html(
+            text,
+            reply_markup=get_onboarding_role_reply_keyboard(roles)
+        )
+        return CHOOSE_ROLE
+
+    # Новый или неполный профиль — запускаем полный онбординг
+    context.user_data["ob_has_profile"] = False
+
     text = (
         "👋 <b>Nexus AI: Регистрация</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
@@ -158,15 +187,17 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     role = context.user_data.get("ob_role")
     phone = context.user_data.get("ob_phone")
     gender = context.user_data.get("ob_gender")
-    
-    # BUG-05: Создаём профиль перед регистрацией (Foreign Key Guard)
+    has_profile = context.user_data.get("ob_has_profile", False)
+
+    # Создаём/получаем профиль (Foreign Key Guard)
     await candidate_service.get_or_create_candidate(user_id, user.first_name, user.last_name, user.username)
-    
-    # Сохраняем личные данные (глобально)
-    await candidate_service.update_candidate_full_name(user_id, full_name)
-    await candidate_service.update_phone_number(user_id, phone)
-    await candidate_service.update_candidate_gender(user_id, gender)
-    
+
+    # Сохраняем личные данные только если профиль не был загружен из существующего
+    if not has_profile:
+        await candidate_service.update_candidate_full_name(user_id, full_name)
+        await candidate_service.update_phone_number(user_id, phone)
+        await candidate_service.update_candidate_gender(user_id, gender)
+
     # Регистрируем на ивент (через новую функцию)
     event = await event_service.get_event(event_id)
     await candidate_service.apply_for_event(
@@ -176,8 +207,8 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         arrival_time=context.user_data.get("ob_time"),
         departure_time=event.end_time
     )
-    
-    # BUG-07: Премиум сообщение подтверждения
+
+    # Премиум сообщение подтверждения
     await update.message.reply_html(
         "🎉 <b>Заявка отправлена!</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
@@ -185,13 +216,13 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⏳ <i>Ожидайте уведомления. Удачи!</i>",
         reply_markup=ReplyKeyboardRemove()
     )
-    
+
     await audit_service.log_action(event_id, "Candidate Registered", user_id, {
         "full_name": full_name,
         "role": role,
         "time": context.user_data.get("ob_time")
     })
-    
+
     return ConversationHandler.END
 
 async def handle_ob_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):

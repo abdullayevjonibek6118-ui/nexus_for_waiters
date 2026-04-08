@@ -24,4 +24,6 @@ class Event(BaseModel):
     end_time: Optional[str] = None
     required_men: int = 0
     required_women: int = 0
+    channel_chat_id: Optional[str] = None
+    channel_message_id: Optional[str] = None
     created_by: Optional[int] = None   # Telegram user_id рекрутера

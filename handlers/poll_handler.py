@@ -75,19 +75,27 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         bot_username = (await context.bot.get_me()).username
         url = f"https://t.me/{bot_username}?start=event_{event_id}"
-        keyboard = [[InlineKeyboardButton("Участвовать", url=url)]]
+        keyboard = [[InlineKeyboardButton("Зарегистрироваться", url=url)]]
         
-        await context.bot.send_message(
+        sent_message = await context.bot.send_message(
             chat_id=group_chat_id,
             text=text,
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"
         )
 
-        await event_service.save_poll_id(event_id, "hiring_msg") # Помечаем что опубликовано
-        await audit_service.log_action(event_id, "Hiring Published", update.effective_user.id)
-
-        await update.effective_message.reply_text("✅ Объявление о наборе опубликовано в группе!")
+        saved_info = await event_service.save_poll_published_info(
+            event_id, 
+            "hiring_msg", 
+            str(group_chat_id), 
+            str(sent_message.message_id)
+        )
+        
+        if saved_info:
+            await audit_service.log_action(event_id, "Hiring Published", update.effective_user.id)
+            await update.effective_message.reply_text("✅ Объявление о наборе опубликовано и ID зафиксированы!")
+        else:
+            await update.effective_message.reply_text("⚠️ Пост отправлен, но данные в базе НЕ ОБНОВИЛИСЬ. Проверьте структуру таблицы.")
 
     except Exception as e:
         logger.error(f"Ошибка публикации в чат: {e}")

@@ -33,6 +33,11 @@ async def create_event(event: Event) -> Event:
             "status": event.status.value,
             "created_by": event.created_by,
         }
+        if event.channel_chat_id:
+            data["channel_chat_id"] = event.channel_chat_id
+        if event.channel_message_id:
+            data["channel_message_id"] = event.channel_message_id
+            
         result = db.table("events").insert(data).execute()
         if result.data:
             event.event_id = event_id
@@ -102,17 +107,19 @@ async def update_event_status(event_id: str, status: EventStatus) -> bool:
         return False
 
 
-async def save_poll_id(event_id: str, poll_id: str) -> bool:
-    """Сохранить poll_id и установить статус Poll_Published."""
+async def save_poll_published_info(event_id: str, poll_id: str, chat_id: str, message_id: str) -> bool:
+    """Сохранить poll_id, статус и данные поста одним запросом."""
     try:
         db = get_db()
-        db.table("events").update({
+        result = db.table("events").update({
             "poll_id": poll_id,
-            "status": EventStatus.POLL_PUBLISHED.value
+            "status": EventStatus.POLL_PUBLISHED.value,
+            "channel_chat_id": str(chat_id),
+            "channel_message_id": str(message_id)
         }).eq("event_id", event_id).execute()
-        return True
+        return len(result.data) > 0
     except Exception as e:
-        logger.error(f"Ошибка сохранения poll_id: {e}")
+        logger.error(f"Ошибка сохранения данных публикации: {e}")
         return False
 
 

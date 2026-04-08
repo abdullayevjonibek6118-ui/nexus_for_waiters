@@ -220,8 +220,103 @@ async def close_event_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await event_service.update_event_status(event_id, EventStatus.CLOSED)
     await audit_service.log_action(event_id, "event_closed", update.effective_user.id, {})
 
+    # Reload event data to ensure we have the latest channel_chat_id and channel_message_id
+    event = await event_service.get_event(event_id)
+
+    post_updated = False
+    post_error = ""
+
+    has_channel_data = (
+        hasattr(event, 'channel_chat_id') and
+        event.channel_chat_id and
+        hasattr(event, 'channel_message_id') and
+        event.channel_message_id
+    )
+
+    if has_channel_data:
+        try:
+            # Rebuild the EXACT same text format that publish_poll used, then append ЗАКРЫТО
+            roles_text = "\n".join([f"• {r}" for r in (event.required_roles or [])])
+            if not roles_text:
+                roles_text = "• Промоутеры\n• Хостес\n• Регистраторы"
+
+            times_text = ", ".join(event.arrival_times) if event.arrival_times else "Не указано"
+
+            # Use the SAME format as publish_poll, then add ЗАКРЫТО
+            closed_text = (
+                "📢 <b>Работа на мероприятии</b>\n\n"
+                f"<b>{event.title}</b>\n\n"
+                f"📅 Дата: {event.date}\n"
+                f"⏰ Начало: {times_text}\n"
+                f"🏁 Конец: {event.end_time or '—'}\n"
+                f"📍 Место: {event.location}\n"
+                f"💰 Оплата: {event.payment or 'По договоренности'}\n\n"
+                f"Нужны сотрудники:\n{roles_text}\n\n"
+                "� Чтобы участвовать нажмите кнопку\n\n"
+                "�🔴 <b>ЗАКРЫТО</b>"
+            )
+
+            # Parse chat_id — handle both string and int formats
+            raw_chat_id = event.channel_chat_id
+            raw_msg_id = event.channel_message_id
+
+            logger.info(f"Attempting to edit message: chat_id={raw_chat_id}, message_id={raw_msg_id}")
+
+            # Convert chat_id: try int first, fallback to string
+            try:
+                chat_id_val = int(raw_chat_id)
+            except (ValueError, TypeError):
+                chat_id_val = raw_chat_id
+
+            # Convert message_id to int
+            try:
+                msg_id = int(raw_msg_id)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid message_id format: {raw_msg_id}") from e
+
+            # Try editing text first
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id_val,
+                    message_id=msg_id,
+                    text=closed_text,
+                    parse_mode="HTML",
+                    reply_markup=None  # Remove the registration button
+                )
+                post_updated = True
+                logger.info(f"Successfully edited message text for event {event_id}")
+            except Exception as inner_e:
+                error_str = str(inner_e)
+                logger.warning(f"edit_message_text failed: {error_str}")
+                # If message is media (has caption instead of text), edit caption
+                if "There is no text in the message to edit" in error_str:
+                    await context.bot.edit_message_caption(
+                        chat_id=chat_id_val,
+                        message_id=msg_id,
+                        caption=closed_text,
+                        parse_mode="HTML",
+                        reply_markup=None  # Remove the registration button
+                    )
+                    post_updated = True
+                    logger.info(f"Successfully edited message caption for event {event_id}")
+                else:
+                    raise inner_e
+
+        except Exception as e:
+            logger.error(f"Failed to update channel post for event {event_id}: {e}", exc_info=True)
+            post_error = str(e)
+    else:
+        logger.warning(
+            f"No channel data for event {event_id}. "
+            f"channel_chat_id={getattr(event, 'channel_chat_id', 'MISSING')}, "
+            f"channel_message_id={getattr(event, 'channel_message_id', 'MISSING')}"
+        )
+        post_error = "ID поста не найдено в базе данных. Убедитесь, что /publish_poll был выполнен успешно."
+
+    status_msg = "\n🔹 <i>Пост в канале обновлен.</i>" if post_updated else f"\n⚠️ <i>Не удалось обновить пост ({post_error}).</i>"
+
     await update.effective_message.reply_html(
-        f"✅ <b>Мероприятие закрыто (в архиве).</b>\n\n"
+        f"✅ <b>Мероприятие закрыто (в архиве).</b>{status_msg}\n\n"
         f"Вы можете посмотреть логи: /logs {event_id}"
     )
 

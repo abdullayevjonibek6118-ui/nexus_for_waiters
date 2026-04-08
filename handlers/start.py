@@ -16,10 +16,51 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """/start — Приветствие и выбор роли."""
     user = update.effective_user
     args = context.args # Параметры после /start
-    
+
     # ПРОВЕРКА DEEP LINKING (Этап 1)
     if args and args[0].startswith("event_"):
         event_id = args[0].replace("event_", "")
+        user_id = user.id
+
+        # Проверяем, зарегистрирован ли пользователь уже на это мероприятие
+        existing_app = await candidate_service.get_event_candidate(event_id, user_id)
+
+        if existing_app:
+            status = existing_app.get("application_status", "")
+            role = existing_app.get("role", "")
+            arrival = existing_app.get("arrival_time", "")
+
+            # Терминальные статусы — нельзя перерегистрироваться
+            terminal_statuses = {"REJECTED", "DECLINED", "CHECKED_IN"}
+            if status in terminal_statuses:
+                status_messages = {
+                    "REJECTED": "❌ К сожалению, ваша заявка была отклонена.",
+                    "DECLINED": "⚠️ Вы ранее отказались от участия в этом мероприятии.",
+                    "CHECKED_IN": "✅ Вы уже отметились на этом мероприятии. Хорошей смены!"
+                }
+                await update.message.reply_text(status_messages.get(status, "Ваш статус: " + status))
+                return
+
+            # Нетерминальные статусы — пользователь уже зарегистрирован
+            active_messages = {
+                "PENDING": "⏳ Ваша заявка на участие уже принята и ожидает рассмотрения.",
+                "ACCEPTED": "✅ Вы уже приняты на это мероприятие!",
+                "SCHEDULED": "⏰ Вам уже назначено время. Ожидайте приглашения.",
+                "INVITED": "📨 Вам уже отправлено приглашение. Проверьте чат с ботом.",
+                "CONFIRMED": "✅ Вы уже подтвердили участие. Ждём вас в день мероприятия!"
+            }
+
+            role_info = f"\n🎭 Роль: {role}" if role else ""
+            time_info = f"\n⏰ Время: {arrival}" if arrival else ""
+
+            await update.message.reply_html(
+                f"👋 <b>{user.first_name}</b>, вы уже зарегистрированы на это мероприятие.{role_info}{time_info}\n\n"
+                f"{active_messages.get(status, f'Статус: {status}')}\n\n"
+                f"Если хотите изменить данные, используйте /start и следуйте инструкциям."
+            )
+            return
+
+        # Пользователь ещё не регистрировался на это мероприятие — начинаем онбординг
         return await start_onboarding(update, context, event_id)
     
     # 1. Сначала проверяем, не Владелец ли это

@@ -39,24 +39,52 @@ async def apply_for_event(
 ) -> bool:
     """
     Регистрирует кандидата на мероприятие через онбординг.
+    Если запись уже существует — обновляет только роль и время, не сбрасывая статус.
     """
     try:
         db = get_db()
-        # Используем upsert: если кандидат нажал "Участвовать" дважды — обновляем данные
-        await asyncio.to_thread(
-            lambda: db.table("event_candidates").upsert({
-                "event_id": event_id,
-                "user_id": user_id,
-                "application_status": ApplicationStatus.PENDING.value,
-                "role": role,
-                "arrival_time": arrival_time,
-                "departure_time": departure_time,
-                # Старые поля для обратной совместимости
-                "vote_status": VoteStatus.YES.value,
-                "selected": False,
-                "confirmed": False,
-            }, on_conflict="event_id,user_id").execute()
+
+        # Сначала проверяем, есть ли уже запись
+        existing = await asyncio.to_thread(
+            lambda: db.table("event_candidates")
+                .select("application_status")
+                .eq("event_id", event_id)
+                .eq("user_id", user_id)
+                .execute()
         )
+
+        if existing.data:
+            # Запись уже существует — обновляем только роль и время, НЕ трогая статус
+            await asyncio.to_thread(
+                lambda: db.table("event_candidates")
+                    .update({
+                        "role": role,
+                        "arrival_time": arrival_time,
+                        "departure_time": departure_time,
+                    })
+                    .eq("event_id", event_id)
+                    .eq("user_id", user_id)
+                    .execute()
+            )
+            logger.info(f"Updated existing application: user={user_id}, event={event_id} (status preserved)")
+        else:
+            # Новая запись — создаём со статусом PENDING
+            await asyncio.to_thread(
+                lambda: db.table("event_candidates").insert({
+                    "event_id": event_id,
+                    "user_id": user_id,
+                    "application_status": ApplicationStatus.PENDING.value,
+                    "role": role,
+                    "arrival_time": arrival_time,
+                    "departure_time": departure_time,
+                    # Старые поля для обратной совместимости
+                    "vote_status": VoteStatus.YES.value,
+                    "selected": False,
+                    "confirmed": False,
+                }).execute()
+            )
+            logger.info(f"Created new application: user={user_id}, event={event_id}")
+
         return True
     except Exception as e:
         logger.error(f"apply_for_event error user={user_id} event={event_id}: {e}")
