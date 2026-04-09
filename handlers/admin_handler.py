@@ -33,7 +33,7 @@ async def is_recruiter(user_id: int) -> bool:
 async def create_sheet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/create_sheet <event_id> — Создать Google Sheet для мероприятия."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /create_sheet <event_id>")
@@ -76,14 +76,14 @@ async def create_sheet_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     else:
         await update.effective_message.reply_text(
             "❌ Не удалось создать Google Sheet.\n"
-            "Проверьте настройки в .env (GOOGLE_CREDENTIALS_FILE)."
+            "Проверьте настройки интеграции с Google Таблицами."
         )
 
 
 async def payment_reminder_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/payment_reminder <event_id> — Запланировать напоминание об оплате."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /payment_reminder <event_id>")
@@ -117,8 +117,7 @@ async def payment_reminder_cmd(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await update.effective_message.reply_html(
         f"⏰ <b>Напоминание запланировано!</b>\n\n"
-        f"Через 14 дней придёт напоминание об оплате.\n"
-        f"Job ID: <code>{job_id}</code>\n\n"
+        f"Через 14 дней придёт напоминание об оплате.\n\n"
         f"Когда оплата получена: /payment_confirmed {event_id}"
     )
 
@@ -126,7 +125,7 @@ async def payment_reminder_cmd(update: Update, context: ContextTypes.DEFAULT_TYP
 async def payment_confirmed_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/payment_confirmed <event_id> — Отменить напоминание (оплата получена)."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /payment_confirmed <event_id>")
@@ -161,7 +160,7 @@ async def payment_confirmed_cmd(update: Update, context: ContextTypes.DEFAULT_TY
 async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/logs <event_id> — Просмотр аудит-лога мероприятия."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /logs <event_id>")
@@ -198,7 +197,7 @@ async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def close_event_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/close_event <event_id> — Закрыть/архивировать мероприятие."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /close_event <event_id>")
@@ -252,8 +251,8 @@ async def close_event_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 f"📍 Место: {event.location}\n"
                 f"💰 Оплата: {event.payment or 'По договоренности'}\n\n"
                 f"Нужны сотрудники:\n{roles_text}\n\n"
-                "� Чтобы участвовать нажмите кнопку\n\n"
-                "�🔴 <b>ЗАКРЫТО</b>"
+                "👇 Чтобы участвовать нажмите кнопку\n\n"
+                "🔴 <b>ЗАКРЫТО</b>"
             )
 
             # Parse chat_id — handle both string and int formats
@@ -317,14 +316,14 @@ async def close_event_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await update.effective_message.reply_html(
         f"✅ <b>Мероприятие закрыто (в архиве).</b>{status_msg}\n\n"
-        f"Вы можете посмотреть логи: /logs {event_id}"
+        f"Вы можете посмотреть записи в логе: /logs {event_id}"
     )
 
 
 async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/export_excel <event_id> — Выгрузить данные в XLSX."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /export_excel <event_id>")
@@ -391,7 +390,7 @@ async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def announce_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/announce <event_id> <сообщение> — Массовая рассылка сообщений."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if len(context.args) < 2:
         await update.effective_message.reply_text("Использование: /announce <event_id> <текст сообщения>")

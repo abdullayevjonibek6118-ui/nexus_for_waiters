@@ -95,7 +95,7 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await audit_service.log_action(event_id, "Hiring Published", update.effective_user.id)
             await update.effective_message.reply_text("✅ Объявление о наборе опубликовано и ID зафиксированы!")
         else:
-            await update.effective_message.reply_text("⚠️ Пост отправлен, но данные в базе НЕ ОБНОВИЛИСЬ. Проверьте структуру таблицы.")
+            await update.effective_message.reply_text("⚠️ Пост отправлен, но данные в базе не обновились. Проверьте структуру таблицы.")
 
     except Exception as e:
         logger.error(f"Ошибка публикации в чат: {e}")

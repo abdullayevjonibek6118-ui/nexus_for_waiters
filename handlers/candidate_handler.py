@@ -31,7 +31,7 @@ async def is_recruiter(user_id: int) -> bool:
 async def list_voters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/voters <event_id> — Список всех проголосовавших."""
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /voters <event_id>")
@@ -151,17 +151,17 @@ async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if "✅ Принять" in text:
         try:
             await candidate_service.transition_application(event_id, uid, ApplicationStatus.ACCEPTED)
-            await update.message.reply_text(f"✅ Кандидат принят.")
+            await update.message.reply_text("✅ Кандидат принят.")
         except Exception as e:
             logger.warning(f"Transition to ACCEPTED failed: {e}")
-        
+
         state["index"] += 1
         await _render_card(update, context, event_id, state["index"])
-        
+
     elif "❌ Отклонить" in text:
         try:
             await candidate_service.transition_application(event_id, uid, ApplicationStatus.REJECTED)
-            await update.message.reply_text(f"❌ Кандидат отклонен.")
+            await update.message.reply_text("❌ Кандидат отклонён.")
         except Exception as e:
             logger.warning(f"Transition to REJECTED failed: {e}")
 
@@ -259,7 +259,7 @@ async def handle_auto_select_input(update: Update, context: ContextTypes.DEFAULT
     context.user_data.pop("auto_select_event")
     await update.message.reply_text(
         f"✅ {selected_count} кандидатов выбрано!\n\n"
-        "Нажмите /events чтобы отправить приглашения.",
+        "Нажмите /events, чтобы отправить приглашения.",
         reply_markup=get_invitation_keyboard(event_id) # На самом деле лучше через Dashboard
     )
 
@@ -271,7 +271,7 @@ async def set_times_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     Формат: /set_times <event_id> <user_id> <HH:MM> <HH:MM>
     """
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /set_times <event_id>")
@@ -384,7 +384,7 @@ async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TY
     Отправляет приватные сообщения выбранным кандидатам с деталями мероприятия.
     """
     if not await is_recruiter(update.effective_user.id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     if not context.args:
         await update.effective_message.reply_text("Использование: /notify_candidates <event_id>")

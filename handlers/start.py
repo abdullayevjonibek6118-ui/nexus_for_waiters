@@ -81,7 +81,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await update.message.reply_html(
                 f"👋 <b>Приветствуем, {user.first_name}!</b>\n\n"
                 f"Вы зарегистрированы как рекрутер компании <b>{company['name']}</b>.\n"
-                "Ваши команды управления доступны в /help.",
+                "Инструменты управления доступны в /events.",
             )
             return
         else:

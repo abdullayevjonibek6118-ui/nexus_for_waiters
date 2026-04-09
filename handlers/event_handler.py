@@ -97,14 +97,14 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def events_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/events — Главная панель рекрутера."""
     if not await is_recruiter(update.effective_user.id):
-        await update.message.reply_text("⛔ У вас нет прав.")
+        await update.message.reply_text("⛔ У вас нет прав для этой команды.")
         return
 
     from utils.keyboards import get_recruiter_dashboard_keyboard
     text = (
         "💼 <b>Панель управления мероприятиями</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Здесь вы можете планировать новые события, управлять активными наборами и просматривать отчеты.\n\n"
+        "Здесь вы можете создавать новые мероприятия, управлять активными наборами и просматривать отчёты.\n\n"
         "✨ <i>Выберите действие ниже:</i>"
     )
     await update.message.reply_html(
@@ -125,7 +125,7 @@ async def create_event_start_cmd(update: Update, context: ContextTypes.DEFAULT_T
         send = update.message.reply_text  # используем reply_text везде
 
     await send(
-        "📝 <b>Шаг 1 из 8: Название</b>\n\nВведите название мероприятия:",
+        "📝 <b>Шаг 1 из 9: Название</b>\n\nВведите название мероприятия:",
         parse_mode="HTML"
     )
     return E_TITLE
@@ -133,7 +133,7 @@ async def create_event_start_cmd(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_ev_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["ev_name"] = update.message.text.strip()
     await update.message.reply_html(
-        "📅 <b>Шаг 2 из 8: Дата</b>\n\n"
+        "📅 <b>Шаг 2 из 9: Дата</b>\n\n"
         "Введите дату мероприятия.\n"
         "<i>Примеры: <code>15 апреля</code>, <code>15 апреля 2026</code>, <code>15.04.2026</code></i>"
     )
@@ -152,12 +152,12 @@ async def handle_ev_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return E_DATE
     context.user_data["ev_date"] = iso_date
-    await update.message.reply_html("📍 <b>Шаг 3 из 8: Место проведения</b>\n\nУкажите точный адрес или заведение:")
+    await update.message.reply_html("📍 <b>Шаг 3 из 9: Место проведения</b>\n\nУкажите точный адрес или заведение:")
     return E_LOC
 
 async def handle_ev_loc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["ev_loc"] = update.message.text.strip()
-    await update.message.reply_html("💰 <b>Шаг 4 из 8: Оплата</b>\n\nУкажите сумму оплаты (например: 4000 или 350-400/час):")
+    await update.message.reply_html("💰 <b>Шаг 4 из 9: Оплата</b>\n\nУкажите сумму оплаты (например: 4000 или 350-400/час):")
     return E_PAYMENT
 
 async def handle_ev_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -166,7 +166,7 @@ async def handle_ev_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if "₽" not in payment_raw and "руб" not in payment_raw.lower():
         payment_raw = f"{payment_raw} ₽"
     context.user_data["ev_payment"] = payment_raw
-    await update.message.reply_html("👥 <b>Шаг 5 из 8: Количество сотрудников</b>\n\nСколько всего человек нужно на мероприятие?")
+    await update.message.reply_html("👥 <b>Шаг 5 из 9: Количество сотрудников</b>\n\nСколько всего человек нужно на мероприятие?")
     return E_MAX
 
 async def handle_ev_max(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -178,8 +178,8 @@ async def handle_ev_max(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     
     context.user_data["ev_max"] = max_c
     await update.message.reply_html(
-        "🚻 <b>Шаг 6 из 8: Требования к полу</b>\n\n"
-        "Сколько нужно парней и девушек?\n"
+        "🚻 <b>Шаг 6 из 9: Требования к полу</b>\n\n"
+        "Сколько нужно мужчин и женщин?\n"
         "<i>Например: <code>М-5 Ж-5</code> или введите <code>0</code> если пол не важен.</i>"
     )
     return E_GENDERS
@@ -199,7 +199,7 @@ async def handle_ev_genders(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     context.user_data["ev_men"] = men
     context.user_data["ev_women"] = women
 
-    await update.message.reply_html("🎭 <b>Шаг 7 из 8: Роли</b>\n\nКакие роли нужны? (через запятую)\n<i>Пример: Промоутер, Хостес, Регистратор</i>")
+    await update.message.reply_html("🎭 <b>Шаг 7 из 9: Роли</b>\n\nКакие роли нужны? (через запятую)\n<i>Пример: Промоутер, Хостес, Регистратор</i>")
     return E_ROLES
 async def handle_ev_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     roles = [r.strip() for r in update.message.text.split(",")]
@@ -299,7 +299,7 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user_id = update.effective_user.id
 
     if not await is_recruiter(user_id):
-        await update.effective_message.reply_text("⛔ У вас нет прав.")
+        await update.effective_message.reply_text("⛔ У вас нет прав для этой команды.")
         return
 
     rec_profile = await recruiter_service.get_recruiter(user_id)
