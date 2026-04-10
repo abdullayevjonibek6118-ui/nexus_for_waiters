@@ -254,17 +254,43 @@ async def handle_ob_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_ob_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Возврат к началу регистрации (к выбору роли)."""
-    # UI-02: Очищаем устаревшие данные в user_data
-    for key in ["ob_role", "ob_phone", "ob_full_name", "ob_time", "ob_gender"]:  # BUG-2 FIX: added ob_gender
-        context.user_data.pop(key, None)
-    
+    user_id = update.effective_user.id
     event_id = context.user_data.get("ob_event_id")
+
+    # Очищаем данные текущего шага (роль и время), но НЕ трогаем профиль
+    context.user_data.pop("ob_role", None)
+    context.user_data.pop("ob_time", None)
+
+    # Для пользователей с существующим профилем — восстанавливаем данные
+    has_profile = context.user_data.get("ob_has_profile", False)
+    if has_profile:
+        existing_profile = await candidate_service.get_candidate_profile(user_id)
+        if existing_profile:
+            context.user_data["ob_full_name"] = existing_profile.full_name
+            context.user_data["ob_phone"] = existing_profile.phone_number
+            context.user_data["ob_gender"] = existing_profile.gender
+    else:
+        # Новый пользователь — очищаем всё
+        for key in ["ob_role", "ob_phone", "ob_full_name", "ob_time", "ob_gender"]:
+            context.user_data.pop(key, None)
+
     event = await event_service.get_event(event_id)
     roles = event.required_roles or ["Промоутер", "Хостес", "Регистратор"]
-    
+
     from utils.keyboards import get_onboarding_role_reply_keyboard
+
+    if has_profile:
+        text = (
+            "📝 <b>Изменение заявки</b>\n\n"
+            "Выберите позицию заново (остальные данные сохранены):"
+        )
+    else:
+        text = (
+            "📝 <b>Шаг 1 из 5: Ваша роль</b>\n\nВыберите позицию:"
+        )
+
     await update.message.reply_html(
-        "📝 <b>Шаг 1 из 5: Ваша роль</b>\n\nВыберите позицию:",
+        text,
         reply_markup=get_onboarding_role_reply_keyboard(roles)
     )
     return CHOOSE_ROLE
