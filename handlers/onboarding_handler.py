@@ -27,37 +27,22 @@ async def start_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE, e
     # Проверяем, есть ли у пользователя уже заполненный профиль
     existing_profile = await candidate_service.get_candidate_profile(user_id)
 
-    if existing_profile and existing_profile.gender and existing_profile.phone_number:
-        # Профиль полностью заполнен — пропускаем шаги и сразу показываем выбор роли
-        context.user_data["ob_has_profile"] = True
-        context.user_data["ob_full_name"] = existing_profile.full_name
-        context.user_data["ob_phone"] = existing_profile.phone_number
-        context.user_data["ob_gender"] = existing_profile.gender
-
-        event = await event_service.get_event(event_id)
-        roles = event.required_roles or ["Промоутер", "Хостес", "Регистратор"]
-
-        from utils.keyboards import get_onboarding_role_reply_keyboard
-        text = (
-            f"👋 <b>С возвращением, {existing_profile.full_name or user.first_name}!</b>\n\n"
-            "Ваш профиль уже сохранён. Осталось только выбрать роль для этого мероприятия."
-        )
-        await update.message.reply_html(
-            text,
-            reply_markup=get_onboarding_role_reply_keyboard(roles)
-        )
-        return CHOOSE_ROLE
-
-    # Новый или неполный профиль — запускаем полный онбординг
-    context.user_data["ob_has_profile"] = False
-
+    # Всегда показываем inline-кнопку "Начать регистрацию" — это entry point ConversationHandler
+    # Без этого ConversationHandler не активируется и следующие сообщения не обрабатываются
     text = (
         "👋 <b>Nexus AI: Регистрация</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
-        "Мы поможем вам быстро подготовить профиль для работы на этом мероприятии.\n\n"
-        "⏳ <i>Это займет меньше минуты.</i>"
     )
-    await update.message.reply_html(text, reply_markup=get_onboarding_start_keyboard(event_id))
+    if existing_profile and existing_profile.gender and existing_profile.phone_number:
+        text += "Ваш профиль уже сохранён. Осталось только выбрать роль для этого мероприятия."
+    else:
+        text += "Мы поможем вам быстро подготовить профиль для работы на этом мероприятии.\n\n"
+        text += "⏳ <i>Это займет меньше минуты.</i>"
+
+    await update.message.reply_html(
+        text,
+        reply_markup=get_onboarding_start_keyboard(event_id)
+    )
     return WAIT_REG_START
 
 async def handle_ob_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -67,23 +52,65 @@ async def handle_ob_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = update.callback_query.message
     else:
         message = update.message
-        
+
+    user_id = update.effective_user.id
+
+    # Определяем, есть ли у пользователя уже заполненный профиль
+    existing_profile = await candidate_service.get_candidate_profile(user_id)
+    has_profile = existing_profile and existing_profile.gender and existing_profile.phone_number
+
+    if has_profile:
+        context.user_data["ob_has_profile"] = True
+        context.user_data["ob_full_name"] = existing_profile.full_name
+        context.user_data["ob_phone"] = existing_profile.phone_number
+        context.user_data["ob_gender"] = existing_profile.gender
+
     event_id = context.user_data.get("ob_event_id")
     event = await event_service.get_event(event_id)
     roles = event.required_roles or ["Промоутер", "Хостес", "Регистратор"]
-    
+
     from utils.keyboards import get_onboarding_role_reply_keyboard
+
+    if has_profile:
+        text = (
+            f"👋 <b>С возвращением, {existing_profile.full_name or update.effective_user.first_name}!</b>\n\n"
+            "📝 <b>Шаг 1 из 1: Ваша роль</b>\n\n"
+            "Выберите позицию, на которой вы хотите работать:"
+        )
+    else:
+        context.user_data["ob_has_profile"] = False
+        text = (
+            "📝 <b>Шаг 1 из 5: Ваша роль</b>\n\n"
+            "Выберите позицию, на которой вы хотите работать:"
+        )
+
     await message.reply_html(
-        "📝 <b>Шаг 1 из 5: Ваша роль</b>\n\nВыберите позицию, на которой вы хотите работать:",
+        text,
         reply_markup=get_onboarding_role_reply_keyboard(roles)
     )
     return CHOOSE_ROLE
 
 async def handle_role_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Шаг 2: Телефон."""
+    """Шаг 2: Телефон (или пропуск если профиль уже есть)."""
     role = update.message.text.strip()
     context.user_data["ob_role"] = role
-    
+
+    has_profile = context.user_data.get("ob_has_profile", False)
+
+    if has_profile:
+        # Профиль уже заполнен — пропускаем телефон, имя, пол и сразу переходим к выбору времени
+        event_id = context.user_data.get("ob_event_id")
+        event = await event_service.get_event(event_id)
+        times = event.arrival_times or ["08:00", "09:00", "10:00"]
+
+        from utils.keyboards import get_onboarding_time_reply_keyboard
+        await update.message.reply_html(
+            "⏰ <b>Шаг 1 из 1: Время прихода</b>\n\nВыберите удобное время начала смены:",
+            reply_markup=get_onboarding_time_reply_keyboard(times)
+        )
+        return CHOOSE_TIME
+
+    # Новый пользователь — запрашиваем контакт
     keyboard = [[KeyboardButton("📞 Поделиться контактом", request_contact=True)]]
     await update.message.reply_html(
         "📱 <b>Шаг 2 из 5: Контактные данные</b>\n\nНажмите кнопку ниже, чтобы отправить номер телефона:",

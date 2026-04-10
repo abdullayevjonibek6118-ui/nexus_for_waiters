@@ -171,7 +171,10 @@ async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
         state["index"] += 1
         await _render_card(update, context, event_id, state["index"])
     elif text == "⬅️ Назад к управлению":
+        from telegram import ReplyKeyboardRemove
         from handlers.event_handler import show_event_management_menu
+        # Убираем клавиатуру карточек перед возвратом
+        await update.message.reply_text("⬅️ Возвращаюсь к управлению мероприятием.", reply_markup=ReplyKeyboardRemove())
         await show_event_management_menu(update, context, event_id)
 
 async def handle_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
