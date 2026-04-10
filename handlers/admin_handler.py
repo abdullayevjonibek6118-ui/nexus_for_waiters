@@ -360,7 +360,12 @@ async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             event_title=event.title,
             event_date=event.date,
             event_location=event.location,
-            candidates=selected
+            candidates=selected,
+            event_payment=event.payment,
+            event_status=event.status.value if hasattr(event, 'status') else None,
+            event_created_at=str(event.created_at) if hasattr(event, 'created_at') and event.created_at else None,
+            required_men=event.required_men if hasattr(event, 'required_men') else 0,
+            required_women=event.required_women if hasattr(event, 'required_women') else 0,
         )
     except Exception as e:
         logger.error(f"Ошибка при генерации Excel: {e}")

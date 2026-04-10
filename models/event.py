@@ -27,3 +27,4 @@ class Event(BaseModel):
     channel_chat_id: Optional[str] = None
     channel_message_id: Optional[str] = None
     created_by: Optional[int] = None   # Telegram user_id рекрутера
+    created_at: Optional[str] = None   # ISO datetime string
