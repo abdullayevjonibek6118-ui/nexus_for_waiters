@@ -133,6 +133,17 @@ async def _render_card(update: Update, context: ContextTypes.DEFAULT_TYPE, event
 async def handle_card_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик действий с карточками (Reply-кнопки)."""
     text = update.message.text
+
+    # Кнопка возврата в главное меню — очищаем всё
+    if text == "⬅️ В главное меню":
+        from utils.keyboards import clear_flow_state
+        clear_flow_state(context)
+        from telegram import ReplyKeyboardRemove
+        await update.message.reply_text("⬅️ Возвращаюсь в главное меню.", reply_markup=ReplyKeyboardRemove())
+        from handlers.event_handler import events_dashboard
+        await events_dashboard(update, context)
+        return
+
     # Нам нужно найти для какого мероприятия мы сейчас смотрим карточки
     # Мы можем хранить current_card_event_id в user_data
     event_id = context.user_data.get("current_card_event_id")
@@ -242,8 +253,11 @@ async def auto_select_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def handle_auto_select_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ввода числа для автоотбора."""
+    if not context.user_data:
+        return
     event_id = context.user_data.get("auto_select_event")
-    if not event_id: return
+    if not event_id:
+        return
     
     try:
         count = int(update.message.text.strip())
@@ -348,9 +362,11 @@ async def handle_set_time_callback(update: Update, context: ContextTypes.DEFAULT
 
 async def handle_time_message_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработка текстового ввода времени после нажатия кнопок."""
+    if not context.user_data:
+        return
     state = context.user_data.get("st_state")
     if not state:
-        return # Не в состоянии ожидания времени - игнорируем
+        return  # Не в состоянии ожидания времени - игнорируем
     
     text = update.message.text.strip()
     parts = text.split()
@@ -560,6 +576,8 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def handle_general_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Захват ФИО вне онбординга (общая регистрация)."""
+    if not context.user_data:
+        return
     if not context.user_data.get("waiting_for_name"):
         return
     

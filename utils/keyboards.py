@@ -199,6 +199,7 @@ def get_event_action_reply_keyboard(event_title: str):
         ["⏰ Назначить время", "🤖 Автоотбор"],
         ["📊 Логи", "❌ Архивировать"],
         ["⬅️ К списку мероприятий"],
+        ["⬅️ В главное меню"],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -209,7 +210,8 @@ def get_candidate_card_keyboard():
     keyboard = [
         ["✅ Принять", "❌ Отклонить"],
         ["➡️ Следующий"],
-        ["⬅️ Назад к управлению"]
+        ["⬅️ Назад к управлению"],
+        ["⬅️ В главное меню"],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -220,7 +222,8 @@ def get_event_post_creation_keyboard():
     keyboard = [
         ["📢 Опубликовать", "👥 Карточки"],
         ["✉️ Уведомить", "📄 Экспорт Excel"],
-        ["🤖 Автоотбор", "⬅️ К списку мероприятий"]
+        ["🤖 Автоотбор", "⬅️ К списку мероприятий"],
+        ["⬅️ В главное меню"],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -238,3 +241,38 @@ def get_set_times_keyboard(selected_candidates: list, event_id: str) -> InlineKe
             InlineKeyboardButton(f"👤 {full_name}", callback_data=f"st_one:{event_id}:{user_id}")
         ])
     return InlineKeyboardMarkup(keyboard)
+
+
+# ─── Навигация ───────────────────────────────────────────────────────────────
+
+FLOW_STATE_KEYS = [
+    # Event creation
+    "ev_name", "ev_date", "ev_loc", "ev_payment", "ev_max",
+    "ev_genders", "ev_men", "ev_women", "ev_roles", "ev_times", "ev_end_time",
+    "selected_event_id", "ev_list",
+    # Onboarding
+    "ob_event_id", "ob_has_profile", "ob_role", "ob_phone",
+    "ob_full_name", "ob_gender", "ob_time",
+    # Candidate cards
+    "current_card_event_id",
+    # Auto-select
+    "auto_select_event",
+    # Time assignment
+    "st_state",
+    # General name input
+    "waiting_for_name",
+    # Super admin
+    "sa_comp_name", "sa_target_comp",
+]
+
+
+def clear_flow_state(context) -> None:
+    """Очистить все данные текущих потоков. Используется при переключении между разделами."""
+    if not context.user_data:
+        return
+    for key in FLOW_STATE_KEYS:
+        context.user_data.pop(key, None)
+    # Также удаляем все динамические карточки
+    keys_to_remove = [k for k in context.user_data.keys() if k.startswith("cards_")]
+    for key in keys_to_remove:
+        context.user_data.pop(key, None)

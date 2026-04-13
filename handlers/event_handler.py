@@ -328,7 +328,11 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def handle_recruiter_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик главного меню рекрутера (Reply-кнопки)."""
     text = update.message.text
-    
+
+    # При переключении раздела — очищаем предыдущие потоки
+    from utils.keyboards import clear_flow_state
+    clear_flow_state(context)
+
     if text == "🆕 Создать мероприятие":
         # Команда /create_event теперь поймается ConversationHandler напрямую
         # Если вдруг нет (например, стейт сбросился), вызываем стартовую логику:
@@ -341,7 +345,7 @@ async def handle_recruiter_menu(update: Update, context: ContextTypes.DEFAULT_TY
         rec_profile = await recruiter_service.get_recruiter(user_id)
         company_id = rec_profile.get("company_id") if rec_profile else None
         events = await event_service.get_active_events(company_id=company_id)
-        
+
         report_text = (
             "📊 <b>Статистика и отчеты</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -362,13 +366,16 @@ async def handle_event_selection(update: Update, context: ContextTypes.DEFAULT_T
     """Обработка выбора конкретного мероприятия из списка (Reply)."""
     text = update.message.text
     ev_list = context.user_data.get("ev_list", {})
-    
+
     if text in ev_list:
         event_id = ev_list[text]
         await show_event_management_menu(update, context, event_id)
     elif text == "⬅️ Назад в меню":
-        from handlers.start import start_command # Избегаем циклического импорта
-        await start_command(update, context)
+        from utils.keyboards import clear_flow_state
+        clear_flow_state(context)
+        from telegram import ReplyKeyboardRemove
+        await update.message.reply_text("⬅️ Возвращаюсь в главное меню.", reply_markup=ReplyKeyboardRemove())
+        await events_dashboard(update, context)
     elif text.startswith("📅"):
         # Если текст начинается с даты, но его нет в ev_list — сессия сброшена
         await update.message.reply_html(
@@ -403,7 +410,16 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
     """Обработчик действий внутри меню мероприятия."""
     text = update.message.text
     event_id = context.user_data.get("selected_event_id")
-    
+
+    # Кнопка возврата в главное меню — очищаем всё
+    if text == "⬅️ В главное меню":
+        from utils.keyboards import clear_flow_state
+        clear_flow_state(context)
+        from telegram import ReplyKeyboardRemove
+        await update.message.reply_text("⬅️ Возвращаюсь в главное меню.", reply_markup=ReplyKeyboardRemove())
+        await events_dashboard(update, context)
+        return
+
     if not event_id and text not in ["⬅️ К списку мероприятий", "⬅️ К списку"]:
         await update.message.reply_html(
             "⚠️ <b>Сессия истекла или бот был перезагружен.</b>\n\n"
@@ -415,7 +431,7 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
         from handlers.poll_handler import publish_poll
         context.args = [event_id]
         await publish_poll(update, context)
-    
+
     elif text == "👥 Карточки":
         from handlers.candidate_handler import show_candidate_cards
         await show_candidate_cards(update, context, event_id=event_id)
@@ -451,6 +467,8 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
         await close_event_cmd(update, context)
 
     elif text in ["⬅️ К списку мероприятий", "⬅️ К списку"]:
+        from utils.keyboards import clear_flow_state
+        clear_flow_state(context)
         await list_events(update, context)
 
 
