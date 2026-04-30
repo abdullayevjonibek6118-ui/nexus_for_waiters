@@ -46,7 +46,6 @@ The platform ensures complete data isolation between companies, with subscriptio
 - **Subscription Control**: Extend subscriptions (1-12 months), automatic blocking on expiry
 - **Data Isolation**: Each company operates in isolated multi-tenant space
 - **Custom Groups**: Assign dedicated Telegram group chat IDs for each company's hiring announcements
-
 ### 👨‍💼 For Recruiters
 - **Event Creation**: 9-step guided conversation (title, date, location, payment, headcount, gender split, roles, arrival times, end time)
 - **Hiring Announcements**: Publish to company's Telegram group with deep-link registration button

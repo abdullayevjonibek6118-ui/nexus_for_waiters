@@ -164,20 +164,27 @@ def main() -> None:
         filters.Regex(r"^(📅|⬅️ Назад в меню)"),
         handle_event_selection
     ), group=0)
-    
-    app.add_handler(MessageHandler(
-        filters.Regex(r"^(📢 Опубликовать|👥 Карточки|✉️ Уведомить|📄 Экспорт Excel|⏰ Назначить время|🤖 Автоотбор|📊 Логи|❌ Архивировать|⬅️ К списку|⬅️ В главное меню)$"),
-        handle_event_menu_action
-    ), group=0)
 
+    # ВАЖНО: handle_card_action должен быть РАНЬШЕ handle_event_menu_action,
+    # иначе кнопка «⬅️ В главное меню» будет перехвачена не тем обработчиком.
     app.add_handler(MessageHandler(
         filters.Regex(r"^(✅ Принять|❌ Отклонить|➡️ Следующий|⬅️ Назад к управлению|⬅️ В главное меню)$"),
         handle_card_action
     ), group=0)
 
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^(📢 Опубликовать|👥 Карточки|✉️ Уведомить|📄 Экспорт Excel|⏰ Назначить время|🤖 Автоотбор|📊 Логи|❌ Архивировать|⬅️ К списку мероприятий|⬅️ К списку)$"),
+        handle_event_menu_action
+    ), group=0)
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_auto_select_input), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_time_message_input), group=2)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_general_name_input), group=3)
+    # Универсальный fallback: «⬅️ В главное меню» из меню мероприятия (не карточки — те обработаны в group=0)
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^⬅️ В главное меню$"),
+        handle_event_menu_action
+    ), group=4)
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(
         filters.COMMAND,

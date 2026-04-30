@@ -411,16 +411,7 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
     text = update.message.text
     event_id = context.user_data.get("selected_event_id")
 
-    # Кнопка возврата в главное меню — очищаем всё
-    if text == "⬅️ В главное меню":
-        from utils.keyboards import clear_flow_state
-        clear_flow_state(context)
-        from telegram import ReplyKeyboardRemove
-        await update.message.reply_text("⬅️ Возвращаюсь в главное меню.", reply_markup=ReplyKeyboardRemove())
-        await events_dashboard(update, context)
-        return
-
-    if not event_id and text not in ["⬅️ К списку мероприятий", "⬅️ К списку"]:
+    if not event_id and text not in ["⬅️ К списку мероприятий", "⬅️ К списку", "⬅️ В главное меню"]:
         await update.message.reply_html(
             "⚠️ <b>Сессия истекла или бот был перезагружен.</b>\n\n"
             "Пожалуйста, выберите мероприятие заново из списка через /events."
@@ -470,6 +461,13 @@ async def handle_event_menu_action(update: Update, context: ContextTypes.DEFAULT
         from utils.keyboards import clear_flow_state
         clear_flow_state(context)
         await list_events(update, context)
+
+    elif text == "⬅️ В главное меню":
+        from utils.keyboards import clear_flow_state
+        clear_flow_state(context)
+        from telegram import ReplyKeyboardRemove
+        await update.message.reply_text("⬅️ Возвращаюсь в главное меню.", reply_markup=ReplyKeyboardRemove())
+        await events_dashboard(update, context)
 
 
 # ─── ConversationHandler ─────────────────────────────────────────────────────
