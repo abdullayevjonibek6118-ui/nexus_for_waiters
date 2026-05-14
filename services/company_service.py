@@ -38,13 +38,13 @@ async def check_subscription(company_id: str) -> bool:
     company = await get_company(company_id)
     if not company:
         return False
-    
+
     if company["status"] != "active":
         return False
-        
+
     until = company.get("subscription_until")
     if not until:
         return False
-        
+
     until_dt = datetime.fromisoformat(until.replace("Z", "+00:00"))
     return until_dt > datetime.now(until_dt.tzinfo)

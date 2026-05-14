@@ -25,15 +25,15 @@ def can_transition(current: ApplicationStatus, next_status: ApplicationStatus) -
 class EventCandidate(BaseModel):
     event_id: str
     user_id: int
-    
+
     # Единый статус вместо разрозненных флагов
     application_status: ApplicationStatus = ApplicationStatus.PENDING
-    
+
     # Данные, специфичные для конкретного ивента (роль на ЭТОМ ивенте)
     role: Optional[str] = None
     arrival_time: Optional[str] = None    # HH:MM (24h)
     departure_time: Optional[str] = None  # HH:MM (24h)
-    
+
     # Старые поля (deprecated, для обратной совместимости)
     vote_status: Optional[VoteStatus] = None
     selected: bool = False

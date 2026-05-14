@@ -17,9 +17,9 @@ from config import settings
 # Хендлеры
 from handlers.start import start_command, help_command
 from handlers.event_handler import (
-    get_create_event_handler, 
-    list_events, 
-    handle_event_action_callback, 
+    get_create_event_handler,
+    list_events,
+    handle_event_action_callback,
     events_dashboard,
     handle_recruiter_menu,
     handle_event_selection,
@@ -80,11 +80,11 @@ def main() -> None:
     async def on_startup(app):
         """Запускается после старта event loop — безопасное место для планировщика."""
         await get_scheduler_async()
-        
+
         # Добавляем крон-задачу для ежедневных напоминаний
         from services.scheduler_service import schedule_daily_reminders
         await schedule_daily_reminders(app.bot)
-        
+
         logger.info("✅ Планировщик задач запущен")
 
     # Инициализация персистентного хранилища
@@ -129,7 +129,7 @@ def main() -> None:
     app.add_handler(CommandHandler("logs", logs_cmd))
     app.add_handler(CommandHandler("export_excel", export_excel_cmd))
     app.add_handler(CommandHandler("announce", announce_cmd))
-    
+
     # ── Владелец (SaaS) ──────────────────────────────────────────────────────
     app.add_handler(CommandHandler("owner", owner_cmd))
     app.add_handler(get_super_admin_handler()) # ConversationHandler для создания компаний
@@ -159,7 +159,7 @@ def main() -> None:
         filters.Regex(r"^(🆕 Создать мероприятие|📋 Мои мероприятия|📊 Отчеты|❓ Помощь)$"),
         handle_recruiter_menu
     ), group=0)
-    
+
     app.add_handler(MessageHandler(
         filters.Regex(r"^(📅|⬅️ Назад в меню)"),
         handle_event_selection

@@ -76,7 +76,7 @@ def _create_spreadsheet_sync(event_title: str, event_date: str, event_location: 
     sheets_svc.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests}).execute()
 
     # drive_svc.permissions().create(fileId=spreadsheet_id, body={"type": "anyone", "role": "reader"}).execute()
-    
+
     return sheet_url
 
 async def create_event_sheet(

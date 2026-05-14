@@ -123,7 +123,7 @@ async def handle_phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     contact = update.message.contact
     phone = contact.phone_number
     context.user_data["ob_phone"] = phone
-    
+
     await update.message.reply_html(
         "👤 <b>Шаг 3 из 5: Ваше имя</b>\n\nВведите ваше <b>ФИО</b> полностью (как в паспорте):",
         reply_markup=ReplyKeyboardRemove()
@@ -134,7 +134,7 @@ async def handle_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Шаг 4: Пол."""
     name = update.message.text.strip()
     context.user_data["ob_full_name"] = name
-    
+
     from utils.keyboards import get_onboarding_gender_reply_keyboard
     await update.message.reply_html(
         "🚻 <b>Шаг 4 из 5: Ваш пол</b>\n\nПожалуйста, выберите ваш пол:",
@@ -148,11 +148,11 @@ async def handle_gender_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     # Конвертируем обратно в Enum-совместимую строку
     gender = "Male" if "Мужской" in gender_text else "Female"
     context.user_data["ob_gender"] = gender
-    
+
     event_id = context.user_data.get("ob_event_id")
     event = await event_service.get_event(event_id)
     times = event.arrival_times or ["08:00", "09:00", "10:00"]
-    
+
     from utils.keyboards import get_onboarding_time_reply_keyboard
     await update.message.reply_html(
         f"⏰ <b>Шаг 5 из 5: Время прихода</b>\n\nВыберите удобное время начала смены:",
@@ -164,7 +164,7 @@ async def handle_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Выбор времени (Этап 7)."""
     time = update.message.text.strip()
     context.user_data["ob_time"] = time
-    
+
     full_name = context.user_data.get("ob_full_name")
     role = context.user_data.get("ob_role")
     phone = context.user_data.get("ob_phone")
@@ -172,7 +172,7 @@ async def handle_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     event_id = context.user_data.get("ob_event_id")
     event = await event_service.get_event(event_id)
     end_time_str = f" — {event.end_time}" if event.end_time else ""
-    
+
     text = (
         "🏁 <b>Почти готово! Проверьте данные:</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
@@ -182,10 +182,10 @@ async def handle_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"⏰ <b>Время:</b> {time}{end_time_str}\n\n"
         "<i>Если всё верно, нажмите «Подтвердить».</i>"
     )
-    
+
     from utils.keyboards import get_onboarding_confirm_reply_keyboard
     await update.message.reply_html(
-        text, 
+        text,
         reply_markup=get_onboarding_confirm_reply_keyboard()
     )
     return CONFIRM_DATA
@@ -193,9 +193,9 @@ async def handle_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def handle_ob_confirm_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик финального выбора: Подтвердить или Изменить."""
     action_text = update.message.text.strip()
-    
+
     logger.debug(f"Onboarding confirm action: '{action_text}'")
-    
+
     if action_text == "✅ Подтвердить":
         return await handle_ob_confirm(update, context)
     elif action_text == "✏️ Изменить":

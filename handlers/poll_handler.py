@@ -64,7 +64,7 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         group_chat_id = None
         if rec_profile and rec_profile.get("companies"):
             group_chat_id = rec_profile["companies"].get("group_chat_id")
-        
+
         # Если в компании не настроено, берем из конфига
         if not group_chat_id or group_chat_id == 0:
             group_chat_id = settings.group_chat_id
@@ -76,7 +76,7 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         bot_username = (await context.bot.get_me()).username
         url = f"https://t.me/{bot_username}?start=event_{event_id}"
         keyboard = [[InlineKeyboardButton("Зарегистрироваться", url=url)]]
-        
+
         sent_message = await context.bot.send_message(
             chat_id=group_chat_id,
             text=text,
@@ -85,12 +85,12 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
         saved_info = await event_service.save_poll_published_info(
-            event_id, 
-            "hiring_msg", 
-            str(group_chat_id), 
+            event_id,
+            "hiring_msg",
+            str(group_chat_id),
             str(sent_message.message_id)
         )
-        
+
         if saved_info:
             await audit_service.log_action(event_id, "Hiring Published", update.effective_user.id)
             await update.effective_message.reply_text("✅ Объявление о наборе опубликовано и ID зафиксированы!")

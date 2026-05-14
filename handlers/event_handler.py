@@ -175,7 +175,7 @@ async def handle_ev_max(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     except ValueError:
         await update.message.reply_text("❌ Введите число!")
         return E_MAX
-    
+
     context.user_data["ev_max"] = max_c
     await update.message.reply_html(
         "🚻 <b>Шаг 6 из 9: Требования к полу</b>\n\n"
@@ -188,14 +188,14 @@ async def handle_ev_genders(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     text = update.message.text.strip().lower()
     men = 0
     women = 0
-    
+
     if text != "0":
         import re
         men_match = re.search(r'м[ -]?(\d+)', text)
         women_match = re.search(r'ж[ -]?(\d+)', text)
         if men_match: men = int(men_match.group(1))
         if women_match: women = int(women_match.group(1))
-        
+
     context.user_data["ev_men"] = men
     context.user_data["ev_women"] = women
 
@@ -209,10 +209,10 @@ async def handle_ev_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from utils.validators import validate_time_format
-    
+
     raw_text = update.message.text.strip()
     times = [t.strip() for t in raw_text.split(",")]
-    
+
     # Валидация каждого времени
     invalid_times = [t for t in times if not validate_time_format(t)]
     if invalid_times:
@@ -228,7 +228,7 @@ async def handle_ev_times(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def handle_ev_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from utils.validators import validate_time_format
-    
+
     end_time = update.message.text.strip()
     if not validate_time_format(end_time):
         await update.message.reply_html(
@@ -238,7 +238,7 @@ async def handle_ev_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return E_END_TIME
 
     context.user_data["ev_end_time"] = end_time
-    
+
     user = update.effective_user
     rec_profile = await recruiter_service.get_recruiter(user.id)
     company_id = rec_profile["company_id"] if rec_profile else None
@@ -264,7 +264,7 @@ async def handle_ev_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE)
         from utils.keyboards import get_event_post_creation_keyboard
         roles_str = ", ".join(context.user_data["ev_roles"])
         times_str = ", ".join(context.user_data["ev_times"])
-        
+
         gender_req = ""
         if saved.required_men > 0 or saved.required_women > 0:
             gender_req = f"\n🚻 <b>Пол:</b> М-{saved.required_men} Ж-{saved.required_women}"
@@ -305,7 +305,7 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     rec_profile = await recruiter_service.get_recruiter(user_id)
     company_id = rec_profile["company_id"] if rec_profile else None
     events = await event_service.get_active_events(company_id=company_id)
-    
+
     if not events:
         await update.effective_message.reply_html("📭 <b>У вас пока нет активных мероприятий.</b>")
         return
@@ -320,7 +320,7 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
     from utils.keyboards import get_events_list_reply_keyboard
     await update.effective_message.reply_html(
-        text, 
+        text,
         reply_markup=get_events_list_reply_keyboard(events)
     )
 
@@ -387,7 +387,7 @@ async def show_event_management_menu(update: Update, context: ContextTypes.DEFAU
     """Хелпер: показать меню управления мероприятием."""
     context.user_data["selected_event_id"] = event_id
     event = await event_service.get_event(event_id)
-    
+
     if not event:
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
@@ -503,10 +503,10 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
     await query.answer()
 
     data = query.data
-    
+
     if data == "ev_create":
         # Переход в диалог создания (через ConversationHandler)
-        # Мы НЕ возвращаем стейт здесь, так как мы вне CH. 
+        # Мы НЕ возвращаем стейт здесь, так как мы вне CH.
         # Но CallbackQueryHandler в entry_points поймает этот callback и начнет диалог.
         return
 
@@ -520,21 +520,21 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
         if not rec_profile:
             await query.message.reply_text("⛔ Ошибка: Профиль рекрутера не найден.")
             return
-        
+
         company_id = rec_profile.get("company_id")
         company_name = rec_profile.get("companies", {}).get("name") if rec_profile.get("companies") else "Моя компания"
-        
+
         await query.message.reply_text("⏳ Формирую общий отчет по всем мероприятиям...")
-        
+
         from services import candidate_service, excel_service
         import os
         import asyncio
-        
+
         candidates = await candidate_service.get_company_applicants(company_id)
         if not candidates:
             await query.message.reply_text("❌ Нет данных для отчета.")
             return
-            
+
         try:
             filepath = await asyncio.to_thread(
                 excel_service.generate_company_report_xlsx,
@@ -558,7 +558,7 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
         rec_profile = await recruiter_service.get_recruiter(user_id)
         company_id = rec_profile.get("company_id") if rec_profile else None
         events = await event_service.get_active_events(company_id=company_id)
-        
+
         text = (
             "📊 <b>Статистика и отчеты</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -590,7 +590,7 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
         from handlers.poll_handler import publish_poll
         context.args = [event_id]
         await publish_poll(update, context)
-    
+
     elif action == "ev_select" or action == "select":
         from handlers.candidate_handler import auto_select_cmd
         context.args = [event_id]

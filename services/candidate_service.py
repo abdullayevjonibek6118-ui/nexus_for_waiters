@@ -101,7 +101,7 @@ async def transition_application(
     """
     try:
         db = get_db()
-        
+
         # Читаем текущий статус
         result = await asyncio.to_thread(
             lambda: db.table("event_candidates")
@@ -110,18 +110,18 @@ async def transition_application(
                 .eq("user_id", user_id)
                 .execute()
         )
-        
+
         if not result.data:
             raise CandidateNotFoundError(
                 f"Заявка не найдена: user={user_id}, event={event_id}"
             )
-        
+
         current = ApplicationStatus(result.data[0]["application_status"])
-        
+
         # Проверяем допустимость перехода
         if not can_transition(current, target_status):
             raise InvalidStatusTransitionError(current, target_status)
-        
+
         # Обновляем статус + синхронизируем старые поля
         update_data = {"application_status": target_status.value}
         if target_status == ApplicationStatus.ACCEPTED:
@@ -133,7 +133,7 @@ async def transition_application(
             update_data["is_checkin_confirmed"] = True
         elif target_status in (ApplicationStatus.REJECTED, ApplicationStatus.DECLINED):
             update_data["selected"] = False
-        
+
         await asyncio.to_thread(
             lambda: db.table("event_candidates")
                 .update(update_data)
@@ -232,11 +232,11 @@ async def get_applicants(
             .select("application_status,role,arrival_time,departure_time,user_id,candidates(first_name,last_name,full_name,phone_number,telegram_username,gender,primary_role)")
             .eq("event_id", event_id)
         )
-        
+
         if status is not None:
             query = query.eq("application_status", status.value)
         # Убрана фильтрация по role IS NOT NULL, чтобы видеть всех кандидатов (в т.ч. из старых опросов)
-        
+
         result = await asyncio.to_thread(lambda: query.execute())
         return result.data or []
     except Exception as e:
@@ -353,10 +353,10 @@ async def get_company_applicants(company_id: str) -> list:
         # Получаем все мероприятия компании
         events_res = db.table("events").select("event_id").eq("company_id", company_id).execute()
         event_ids = [e["event_id"] for e in events_res.data]
-        
+
         if not event_ids:
             return []
-            
+
         # Получаем всех кандидатов для этих мероприятий с данными профилей и мероприятий
         result = (
             db.table("event_candidates")
