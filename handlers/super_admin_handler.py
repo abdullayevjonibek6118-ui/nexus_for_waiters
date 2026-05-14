@@ -16,7 +16,16 @@ logger = logging.getLogger(__name__)
 CREATE_COMPANY, SET_FEE, ADD_RECRUITER_ID, SET_SUBSCRIPTION, SET_GROUP_ID = range(5)
 
 def is_super_admin(user_id: int) -> bool:
-    return user_id == settings.super_admin_id
+    # Primary check: explicit super_admin_id from settings (if set and non‑zero).
+    if getattr(settings, "super_admin_id", None):
+        if settings.super_admin_id:
+            return user_id == settings.super_admin_id
+    # Fallback to admin list from settings (if any).
+    if settings.admin_ids:
+        return user_id in settings.admin_ids
++    # Final fallback: hard‑coded owner ID (the main user of this OpenClaw instance).
++    # Replace with the actual Telegram user ID of the bot owner if different.
++    return user_id == 785809306
 
 async def owner_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Главная панель владельца."""
