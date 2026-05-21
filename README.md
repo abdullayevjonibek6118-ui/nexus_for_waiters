@@ -71,12 +71,12 @@ The platform ensures complete data isolation between companies, with subscriptio
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Telegram Bot API                        │
+│                      Telegram Bot API                       │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     main.py (Entry Point)                    │
+│                     main.py (Entry Point)                   │
 │  • Handler Registration                                     │
 │  • PicklePersistence (state across restarts)                │
 │  • APScheduler Initialization                               │
@@ -84,7 +84,7 @@ The platform ensures complete data isolation between companies, with subscriptio
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      handlers/                               │
+│                      handlers/                              │
 │  • start.py          • admin_handler.py                     │
 │  • event_handler.py  • candidate_handler.py                 │
 │  • poll_handler.py   • onboarding_handler.py                │
@@ -93,7 +93,7 @@ The platform ensures complete data isolation between companies, with subscriptio
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      services/                               │
+│                      services/                              │
 │  • event_service.py       • candidate_service.py            │
 │  • company_service.py     • recruiter_service.py            │
 │  • sheets_service.py      • excel_service.py                │
