@@ -62,7 +62,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
         # Пользователь ещё не регистрировался на это мероприятие — начинаем онбординг
         return await start_onboarding(update, context, event_id)
-    
+
     # 1. Сначала проверяем, не Владелец ли это
     if user.id == settings.super_admin_id:
         await update.message.reply_html(
@@ -128,7 +128,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/help — Справочная информация (Premium UI)."""
     user = update.effective_user
-    
+
     # Владелец
     if user.id == settings.super_admin_id:
         text = (

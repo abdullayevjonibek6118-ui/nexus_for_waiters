@@ -9,7 +9,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.triggers.cron import CronTrigger
 from config import settings
-from services import event_service, candidate_service, company_service
+# Lazy import of services to avoid circular import during test imports
+# Import statements will be placed inside functions where needed.
+
 
 logger = logging.getLogger(__name__)
 

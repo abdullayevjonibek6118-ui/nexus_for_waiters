@@ -37,7 +37,7 @@ async def create_event(event: Event) -> Event:
             data["channel_chat_id"] = event.channel_chat_id
         if event.channel_message_id:
             data["channel_message_id"] = event.channel_message_id
-            
+
         result = db.table("events").insert(data).execute()
         if result.data:
             event.event_id = event_id
@@ -80,16 +80,16 @@ async def get_active_events(company_id: Optional[str] = None) -> List[Event]:
         )
         if company_id:
             query = query.eq("company_id", company_id)
-            
+
         result = query.execute()
-        
+
         events = []
         for row in (result.data or []):
             try:
                 events.append(Event(**row))
             except Exception as parse_err:
                 logger.warning(f"Skipping malformed event {row.get('event_id', 'unknown')}: {parse_err}")
-                
+
         return events
     except Exception as e:
         logger.error(f"Ошибка получения мероприятий (company={company_id}): {e}")

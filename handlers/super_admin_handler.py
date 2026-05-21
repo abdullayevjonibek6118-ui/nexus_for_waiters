@@ -16,7 +16,16 @@ logger = logging.getLogger(__name__)
 CREATE_COMPANY, SET_FEE, ADD_RECRUITER_ID, SET_SUBSCRIPTION, SET_GROUP_ID = range(5)
 
 def is_super_admin(user_id: int) -> bool:
-    return user_id == settings.super_admin_id
+    # Primary check: explicit super_admin_id from settings (if set and non‑zero).
+    if getattr(settings, "super_admin_id", None):
+        if settings.super_admin_id:
+            return user_id == settings.super_admin_id
+    # Fallback to admin list from settings (if any).
+    if settings.admin_ids:
+        return user_id in settings.admin_ids
++    # Final fallback: hard‑coded owner ID (the main user of this OpenClaw instance).
++    # Replace with the actual Telegram user ID of the bot owner if different.
++    return user_id == 785809306
 
 async def owner_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Главная панель владельца."""
@@ -28,7 +37,7 @@ async def owner_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         [InlineKeyboardButton("📋 Список компаний", callback_data="sa:list_companies")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     await update.message.reply_html(
         "👑 <b>Панель владельца Nexus AI</b>\n\n"
         "Управляйте компаниями, рекрутерами и подписками.",
@@ -57,7 +66,7 @@ async def sa_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             status = "✅" if c["status"] == "active" else "❌"
             text += f"{status} {c['name']} | ID: <code>{c['id'][:8]}</code>\n"
             keyboard.append([InlineKeyboardButton(f"⚙️ {c['name']}", callback_data=f"sa:manage:{c['id']}")])
-        
+
         keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data="sa:main")])
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
@@ -65,7 +74,7 @@ async def sa_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         company_id = data.split(":")[2]
         company = await company_service.get_company(company_id)
         recruiters = await recruiter_service.list_company_recruiters(company_id)
-        
+
         text = (
             f"🏢 <b>Компания: {company['name']}</b>\n"
             f"🆔 ID: <code>{company['id']}</code>\n"
@@ -74,7 +83,7 @@ async def sa_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"👥 Рекрутеров: {len(recruiters)}\n"
             f"📊 Статус: {company['status']}"
         )
-        
+
         keyboard = [
             [InlineKeyboardButton("➕ Добавить рекрутера", callback_data=f"sa:add_rec:{company_id}")],
             [InlineKeyboardButton("📅 Продлить подписку", callback_data=f"sa:sub:{company_id}")],
@@ -109,15 +118,15 @@ async def company_fee_received(update: Update, context: ContextTypes.DEFAULT_TYP
     except ValueError:
         await update.message.reply_text("Введите число!")
         return SET_FEE
-        
+
     name = context.user_data.get("sa_comp_name")
     company = await company_service.create_company(name, fee)
-    
+
     if company:
         await update.message.reply_html(f"✅ Компания <b>{name}</b> создана!\nID: <code>{company['id']}</code>")
     else:
         await update.message.reply_text("❌ Ошибка при создании.")
-    
+
     return ConversationHandler.END
 
 # --- Flow для добавления рекрутера ---
@@ -136,15 +145,15 @@ async def recruiter_id_received(update: Update, context: ContextTypes.DEFAULT_TY
     except ValueError:
         await update.message.reply_text("Введите корректный ID (число):")
         return ADD_RECRUITER_ID
-        
+
     company_id = context.user_data.get("sa_target_comp")
     res = await recruiter_service.add_recruiter(user_id, company_id)
-    
+
     if res:
         await update.message.reply_text(f"✅ Рекрутер {user_id} добавлен в компанию.")
     else:
         await update.message.reply_text("❌ Ошибка при добавлении.")
-    
+
     return ConversationHandler.END
 
 # --- Продление подписки ---
@@ -163,16 +172,16 @@ async def sub_months_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     except ValueError:
         await update.message.reply_text("Введите число месяцев!")
         return SET_SUBSCRIPTION
-        
+
     company_id = context.user_data.get("sa_target_comp")
     until = datetime.now() + timedelta(days=30 * months)
     res = await company_service.update_subscription(company_id, until)
-    
+
     if res:
         await update.message.reply_text(f"✅ Подписка продлена до {until.strftime('%d.%m.%Y')}")
     else:
         await update.message.reply_text("❌ Ошибка.")
-        
+
     return ConversationHandler.END
 
 # --- Установка ID группы ---
@@ -191,16 +200,16 @@ async def group_id_received(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except ValueError:
         await update.message.reply_text("Введите корректный Chat ID (число):")
         return SET_GROUP_ID
-        
+
     company_id = context.user_data.get("sa_target_comp")
     from database import supabase
     res = supabase.table("companies").update({"group_chat_id": group_id}).eq("id", company_id).execute()
-    
+
     if res.data:
         await update.message.reply_text(f"✅ ID группы {group_id} сохранён для компании.")
     else:
         await update.message.reply_text("❌ Ошибка.")
-    
+
     return ConversationHandler.END
 
 async def cancel_sa(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

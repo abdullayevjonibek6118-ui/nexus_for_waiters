@@ -11,11 +11,11 @@ from telegram.constants import ParseMode
 from config import settings
 from utils.constants import ApplicationStatus, EventStatus
 from services import (
-    event_service, 
-    candidate_service, 
-    sheets_service, 
-    audit_service, 
-    scheduler_service, 
+    event_service,
+    candidate_service,
+    sheets_service,
+    audit_service,
+    scheduler_service,
     recruiter_service,
     excel_service
 )
@@ -167,7 +167,7 @@ async def logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     event_id = context.args[0]
-    
+
     # Изоляция данных
     if update.effective_user.id != settings.super_admin_id:
         event = await event_service.get_event(event_id)
@@ -346,7 +346,7 @@ async def export_excel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not selected:
         logger.info(f"No selected candidates for {event_id}, trying all applicants.")
         selected = await candidate_service.get_applicants(event_id)
-        
+
     if not selected:
         await update.effective_message.reply_text("❌ Нет данных для выгрузки (никто не подавал заявку).")
         return
@@ -403,7 +403,7 @@ async def announce_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     event_id = context.args[0]
     message_text = " ".join(context.args[1:])
-    
+
     event = await event_service.get_event(event_id)
     if not event:
         await update.effective_message.reply_text("❌ Мероприятие не найдено.")
@@ -423,7 +423,7 @@ async def announce_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     sent, failed = 0, 0
     full_message = f"📢 <b>Объявление по {event.title}:</b>\n\n{message_text}"
-    
+
     for c in selected:
         user_id = c.get("user_id")
         try:
