@@ -160,7 +160,7 @@ pip install -r requirements.txt
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file in the project root. You can start from `.env.example`:
+Create a `.env` file in the project root for local development:
 
 ```env
 # Telegram Bot

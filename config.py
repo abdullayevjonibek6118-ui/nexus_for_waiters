@@ -73,5 +73,5 @@ except ValidationError as exc:
         "Missing required environment variables: "
         f"{missing_text}. "
         "Set them in your hosting provider secrets/environment settings "
-        "or create a local .env file from .env.example."
+        "or create a local .env file for development."
     ) from exc
