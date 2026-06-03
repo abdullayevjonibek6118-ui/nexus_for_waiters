@@ -2,14 +2,19 @@
 Nexus AI Bot — Configuration
 Загрузка настроек из .env файла через Pydantic Settings
 """
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import ValidationError, field_validator
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -55,4 +60,18 @@ class Settings(BaseSettings):
 
 
 # Singleton настроек
-settings = Settings()
+try:
+    settings = Settings()
+except ValidationError as exc:
+    missing_fields = [
+        str(error["loc"][0]).upper()
+        for error in exc.errors()
+        if error.get("type") == "missing" and error.get("loc")
+    ]
+    missing_text = ", ".join(missing_fields) or "required environment variables"
+    raise RuntimeError(
+        "Missing required environment variables: "
+        f"{missing_text}. "
+        "Set them in your hosting provider secrets/environment settings "
+        "or create a local .env file from .env.example."
+    ) from exc

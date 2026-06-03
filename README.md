@@ -160,7 +160,7 @@ pip install -r requirements.txt
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root. You can start from `.env.example`:
 
 ```env
 # Telegram Bot
@@ -183,6 +183,8 @@ TIMEZONE=Asia/Tashkent
 # Logging
 LOG_LEVEL=INFO
 ```
+
+For Docker, Render, Railway, Replit, or any GitHub-based deployment, do not rely on the local `.env` file being uploaded. `.env` is intentionally ignored by Git, so set the same variables in your hosting provider's environment/secrets panel.
 
 ### 3. Set Up Database
 
