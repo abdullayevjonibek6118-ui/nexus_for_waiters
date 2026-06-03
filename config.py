@@ -4,6 +4,7 @@ Nexus AI Bot — Configuration
 """
 from pathlib import Path
 from typing import List
+from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import ValidationError, field_validator
 
@@ -17,7 +18,8 @@ class Settings(BaseSettings):
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore"
+        extra="ignore",
+        str_strip_whitespace=True,
     )
 
     # Telegram
@@ -50,6 +52,15 @@ class Settings(BaseSettings):
         if invalid:
             raise ValueError(f"ADMIN_USER_IDS contains non-numeric values: {', '.join(invalid)}")
         return value
+
+    @field_validator("supabase_url")
+    @classmethod
+    def validate_supabase_url(cls, value: str) -> str:
+        """Validate Supabase URL early so Railway misconfiguration is obvious."""
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("SUPABASE_URL must be a full URL, for example https://project.supabase.co")
+        return value.rstrip("/")
 
     @property
     def admin_ids(self) -> List[int]:

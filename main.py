@@ -3,14 +3,19 @@ Nexus AI Telegram Bot — Точка входа
 Регистрация всех хендлеров и запуск бота.
 """
 import logging
+import warnings
+from telegram import Update
+from telegram.error import Conflict, NetworkError, TelegramError
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
+    ContextTypes,
     PicklePersistence,
     filters,
 )
+from telegram.warnings import PTBUserWarning
 from config import settings
 
 # Хендлеры
@@ -68,6 +73,37 @@ def setup_logging():
     )
     # Уменьшим шуm от httpx
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    warnings.filterwarnings(
+        "ignore",
+        message=r"If 'per_message=False', 'CallbackQueryHandler' will not be tracked for every message.*",
+        category=PTBUserWarning,
+    )
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Centralized handler for Telegram/network errors."""
+    logger = logging.getLogger(__name__)
+    error = context.error
+
+    if isinstance(error, Conflict):
+        logger.error(
+            "Telegram polling conflict: another bot instance is already running with this BOT_TOKEN. "
+            "Stop duplicate Railway deployments/processes and keep only one replica."
+        )
+        return
+
+    if isinstance(error, NetworkError):
+        logger.error("Network error while handling Telegram update: %s", error)
+    else:
+        logger.exception("Unhandled error while processing update", exc_info=error)
+
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "⚠️ Произошла временная ошибка. Проверьте настройки Railway/Supabase и попробуйте еще раз."
+            )
+        except TelegramError:
+            logger.warning("Failed to send error message to user", exc_info=True)
 
 
 def main() -> None:
@@ -100,6 +136,7 @@ def main() -> None:
         .write_timeout(60)
         .build()
     )
+    app.add_error_handler(error_handler)
 
     # ── Базовые команды ──────────────────────────────────────────────────────
     app.add_handler(CommandHandler("start", start_command))

@@ -53,7 +53,17 @@ async def sa_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     data = query.data
 
     if data == "sa:list_companies":
-        companies = await company_service.list_companies()
+        try:
+            companies = await company_service.list_companies()
+        except Exception as e:
+            logger.error("Failed to list companies: %s", e)
+            await query.edit_message_text(
+                "⚠️ Не удалось подключиться к базе данных.\n\n"
+                "Проверьте в Railway переменные SUPABASE_URL и SUPABASE_KEY, "
+                "а также доступность Supabase."
+            )
+            return
+
         if not companies:
             await query.edit_message_text("📭 Компаний пока нет.")
             return
@@ -70,8 +80,20 @@ async def sa_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     elif data.startswith("sa:manage:"):
         company_id = data.split(":")[2]
-        company = await company_service.get_company(company_id)
-        recruiters = await recruiter_service.list_company_recruiters(company_id)
+        try:
+            company = await company_service.get_company(company_id)
+            recruiters = await recruiter_service.list_company_recruiters(company_id)
+        except Exception as e:
+            logger.error("Failed to load company %s: %s", company_id, e)
+            await query.edit_message_text(
+                "⚠️ Не удалось загрузить компанию из базы данных.\n\n"
+                "Проверьте SUPABASE_URL и SUPABASE_KEY в Railway."
+            )
+            return
+
+        if not company:
+            await query.edit_message_text("❌ Компания не найдена.")
+            return
 
         text = (
             f"🏢 <b>Компания: {company['name']}</b>\n"
