@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS events (
     sheet_url TEXT,
     required_roles JSONB DEFAULT '[]', -- Список нужных ролей
     arrival_times JSONB DEFAULT '[]',  -- Доступные времена прихода
+    end_time TEXT, -- Время окончания смены
+    channel_chat_id TEXT, -- ID чата опубликованного объявления
+    channel_message_id TEXT, -- ID сообщения опубликованного объявления
     required_men INTEGER NOT NULL DEFAULT 0,
     required_women INTEGER NOT NULL DEFAULT 0,
     created_by BIGINT, -- Telegram user_id рекрутера
@@ -66,6 +69,10 @@ CREATE TABLE IF NOT EXISTS event_candidates (
     vote_status TEXT CHECK (
         vote_status IN ('yes', 'no', 'maybe')
     ),
+    application_status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        application_status IN ('pending', 'accepted', 'scheduled', 'invited', 'confirmed', 'checked_in', 'rejected', 'declined')
+    ),
+    role TEXT, -- Роль кандидата на конкретном мероприятии
     selected BOOLEAN DEFAULT FALSE,
     arrival_time TEXT, -- Время, выбранное кандидатом
     departure_time TEXT, -- HH:MM (24h)
@@ -84,6 +91,25 @@ CREATE TABLE IF NOT EXISTS event_logs (
     timestamp TIMESTAMPTZ DEFAULT now (),
     details JSONB DEFAULT '{}'
 );
+
+-- ─── Миграции для существующих инсталляций ───────────────────────────────────
+ALTER TABLE events ADD COLUMN IF NOT EXISTS end_time TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS channel_chat_id TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS channel_message_id TEXT;
+
+ALTER TABLE event_candidates ADD COLUMN IF NOT EXISTS application_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE event_candidates ADD COLUMN IF NOT EXISTS role TEXT;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'event_candidates_application_status_check'
+    ) THEN
+        ALTER TABLE event_candidates
+        ADD CONSTRAINT event_candidates_application_status_check
+        CHECK (application_status IN ('pending', 'accepted', 'scheduled', 'invited', 'confirmed', 'checked_in', 'rejected', 'declined'));
+    END IF;
+END $$;
 
 -- ─── Индексы для производительности ──────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_events_status ON events (status);

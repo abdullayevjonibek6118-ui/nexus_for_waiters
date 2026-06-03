@@ -16,9 +16,20 @@ SCOPES = [
 ]
 
 
+def _get_service():
+    """Build Google Sheets and Drive clients from the configured service account."""
+    credentials = Credentials.from_service_account_file(
+        settings.google_credentials_file,
+        scopes=SCOPES,
+    )
+    sheets_svc = build("sheets", "v4", credentials=credentials)
+    drive_svc = build("drive", "v3", credentials=credentials)
+    return sheets_svc, drive_svc
+
+
 def _create_spreadsheet_sync(event_title: str, event_date: str, event_location: str, candidates: List[dict]):
     """Синхронная логика создания таблицы для asyncio.to_thread."""
-    sheets_svc, drive_svc = _get_service()
+    sheets_svc, _drive_svc = _get_service()
     sheet_name = f"{event_date} - {event_location} - {event_title}"
 
     # Создать новую таблицу
@@ -42,7 +53,8 @@ def _create_spreadsheet_sync(event_title: str, event_date: str, event_location: 
         phone = profile.get("phone_number", "—")
         arrival = c.get("arrival_time", "—")
         departure = c.get("departure_time", "—")
-        confirmed = "✅" if c.get("confirmed") else "❌"
+        app_status = str(c.get("application_status") or "").lower()
+        confirmed = "✅" if app_status == "confirmed" or c.get("confirmed") is True else "❌"
         rows.append([full_name, gender, phone, arrival, departure, confirmed])
 
     values = headers + rows

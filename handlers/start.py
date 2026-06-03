@@ -66,7 +66,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # 1. Сначала проверяем, не Владелец ли это
     if user.id == settings.super_admin_id:
         await update.message.reply_html(
-            f"👑 <b>Здравствуйте, Владелец!</b>\n\n"
+            "👑 <b>Здравствуйте, Владелец!</b>\n\n"
             "Вы в режиме супер-админа. Используйте /owner для управления платформой.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⚙️ Панель управления", callback_data="sa:main")]])
         )

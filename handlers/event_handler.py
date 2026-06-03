@@ -14,9 +14,7 @@ from telegram.ext import (
 )
 from config import settings
 from models.event import Event
-from services import event_service, audit_service, recruiter_service, candidate_service
-from utils.keyboards import get_event_keyboard
-from utils.validators import validate_date_format, validate_max_candidates
+from services import event_service, recruiter_service
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +191,10 @@ async def handle_ev_genders(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         import re
         men_match = re.search(r'м[ -]?(\d+)', text)
         women_match = re.search(r'ж[ -]?(\d+)', text)
-        if men_match: men = int(men_match.group(1))
-        if women_match: women = int(women_match.group(1))
+        if men_match:
+            men = int(men_match.group(1))
+        if women_match:
+            women = int(women_match.group(1))
 
     context.user_data["ev_men"] = men
     context.user_data["ev_women"] = women
@@ -570,7 +570,8 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=get_recruiter_dashboard_keyboard())
         return
 
-    if ":" not in data: return
+    if ":" not in data:
+        return
     action, event_id = data.split(":")[:2]
 
     if action == "manage":

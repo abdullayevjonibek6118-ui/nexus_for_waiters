@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    @field_validator("admin_user_ids")
+    @classmethod
+    def validate_admin_user_ids(cls, value: str) -> str:
+        """Validate comma-separated Telegram user IDs at startup."""
+        if not value:
+            return ""
+        invalid = [uid.strip() for uid in value.split(",") if uid.strip() and not uid.strip().isdigit()]
+        if invalid:
+            raise ValueError(f"ADMIN_USER_IDS contains non-numeric values: {', '.join(invalid)}")
+        return value
+
     @property
     def admin_ids(self) -> List[int]:
         """Список Telegram user_id администраторов."""

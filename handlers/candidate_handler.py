@@ -8,8 +8,6 @@ from telegram.ext import ContextTypes
 from config import settings
 from utils.constants import ApplicationStatus, EventStatus
 from utils.keyboards import (
-    get_candidate_select_keyboard,
-    get_confirm_keyboard,
     get_set_times_keyboard,
     get_candidate_card_keyboard,
     get_invitation_keyboard,
@@ -96,7 +94,6 @@ async def _render_card(update: Update, context: ContextTypes.DEFAULT_TYPE, event
 
     # Получаем данные из кеша (N+1 Optimization)
     v_data = state["data"][index]
-    uid = v_data["user_id"]
     cand_profile = v_data.get("candidates", {})
 
     fullname = (cand_profile.get("full_name") or cand_profile.get("first_name")) or "Неизвестно"
@@ -197,10 +194,12 @@ async def handle_card_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     event_id = parts[1]
 
     state = context.user_data.get(f"cards_{event_id}")
-    if not state: return
+    if not state:
+        return
 
     current_index = state.get("index", 0)
-    if current_index >= len(state.get("data", [])): return
+    if current_index >= len(state.get("data", [])):
+        return
 
     if action == "card_accept":
         try:
@@ -261,7 +260,7 @@ async def handle_auto_select_input(update: Update, context: ContextTypes.DEFAULT
 
     try:
         count = int(update.message.text.strip())
-    except:
+    except ValueError:
         await update.message.reply_text("Введите число!")
         return
 
@@ -269,7 +268,8 @@ async def handle_auto_select_input(update: Update, context: ContextTypes.DEFAULT
     # Берем первых 'count' кандидатов, которые еще не отклонены
     selected_count = 0
     for v in voters:
-        if selected_count >= count: break
+        if selected_count >= count:
+            break
         await candidate_service.transition_application(event_id, v["user_id"], ApplicationStatus.ACCEPTED)
         selected_count += 1
 
@@ -318,10 +318,10 @@ async def set_times_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        f"⏰ <b>Назначение времени для мероприятия</b>\n\n"
-        f"Выберите кандидата, чтобы назначить ему время,\n"
-        f"или нажмите «Назначить всем одинаковое время».\n\n"
-        f"<b>Текущие времена:</b>\n"
+        "⏰ <b>Назначение времени для мероприятия</b>\n\n"
+        "Выберите кандидата, чтобы назначить ему время,\n"
+        "или нажмите «Назначить всем одинаковое время».\n\n"
+        "<b>Текущие времена:</b>\n"
     )
     for c in selected:
         p = c.get("candidates", {}) or {}
@@ -392,9 +392,10 @@ async def handle_time_message_input(update: Update, context: ContextTypes.DEFAUL
         await candidate_service.set_arrival_departure(event_id, user_id, arrival, departure)
         await update.message.reply_html(f"✅ Время <b>{arrival} – {departure}</b> назначено для ID <code>{user_id}</code>")
 
-    # Очищаем состояние и предлагаем вернуться к списку
+    # Очищаем состояние и показываем обновленный список для текущего мероприятия.
     context.user_data.pop("st_state")
-    await set_times_cmd(update, context) # Повторно вызываем команду, чтобы показать обновленный список
+    context.args = [event_id]
+    await set_times_cmd(update, context)
 
 
 async def notify_candidates_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -629,5 +630,5 @@ async def handle_confirm_checkin_callback(update: Update, context: ContextTypes.
             chat_id=candidate_id,
             text="✅ Рекрутер подтвердил ваш приход на мероприятие! Хорошей смены."
         )
-    except:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to notify candidate {candidate_id} about confirmed check-in: {e}")

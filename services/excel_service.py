@@ -75,19 +75,25 @@ def calc_hours(arrival, departure) -> float:
         return 0.0
 
 
+def normalize_status(status: str | None) -> str:
+    """Normalize application statuses stored by the app or legacy exports."""
+    return str(status or "").lower()
+
+
 def status_label(status: str) -> str:
     """Человекочитаемый статус заявки."""
     mapping = {
-        "PENDING": "Ожидает",
-        "ACCEPTED": "Принят",
-        "SCHEDULED": "Назначен",
-        "INVITED": "Приглашён",
-        "CONFIRMED": "Подтверждён",
-        "CHECKED_IN": "Отметился",
-        "REJECTED": "Отклонён",
-        "DECLINED": "Отказался",
+        "pending": "Ожидает",
+        "accepted": "Принят",
+        "scheduled": "Назначен",
+        "invited": "Приглашён",
+        "confirmed": "Подтверждён",
+        "checked_in": "Отметился",
+        "rejected": "Отклонён",
+        "declined": "Отказался",
     }
-    return mapping.get(status, status or "—")
+    normalized = normalize_status(status)
+    return mapping.get(normalized, status or "—")
 
 
 # Стили
@@ -219,10 +225,10 @@ def generate_event_xlsx(
     ws2 = wb.create_sheet("Сводка")
 
     total_applicants = len(candidates)
-    accepted = sum(1 for c in candidates if c.get("application_status") == "ACCEPTED")
-    rejected = sum(1 for c in candidates if c.get("application_status") == "REJECTED")
-    confirmed = sum(1 for c in candidates if c.get("application_status") == "CONFIRMED")
-    checked_in = sum(1 for c in candidates if c.get("application_status") == "CHECKED_IN")
+    accepted = sum(1 for c in candidates if normalize_status(c.get("application_status")) == "accepted")
+    rejected = sum(1 for c in candidates if normalize_status(c.get("application_status")) == "rejected")
+    confirmed = sum(1 for c in candidates if normalize_status(c.get("application_status")) == "confirmed")
+    checked_in = sum(1 for c in candidates if normalize_status(c.get("application_status")) == "checked_in")
     men_count = sum(1 for c in candidates if (c.get("candidates") or {}).get("gender") == "Male")
     women_count = sum(1 for c in candidates if (c.get("candidates") or {}).get("gender") == "Female")
 
@@ -251,7 +257,7 @@ def generate_event_xlsx(
     if event_created_at:
         # Расчёт Time to Hire: от создания мероприятия до первого отклика
         try:
-            created_dt = datetime.fromisoformat(event_created_at.replace("Z", "+00:00").replace("+00:00", ""))
+            datetime.fromisoformat(event_created_at.replace("Z", "+00:00").replace("+00:00", ""))
             # Ищем первый лог "Candidate Registered"
             # Эта информация передаётся через event_logs отдельно
             summary_data.insert(4, ("Создано", event_created_at[:19]))
@@ -384,7 +390,7 @@ def generate_company_report_xlsx(company_name: str, candidates: list) -> str:
         ev_id = event.get("event_id", "")
         monthly[month_key]["events"].add(ev_id)
         monthly[month_key]["applicants"] += 1
-        if c.get("application_status") == "ACCEPTED":
+        if normalize_status(c.get("application_status")) == "accepted":
             monthly[month_key]["accepted"] += 1
 
         arrival = c.get("arrival_time") or "—"
@@ -579,7 +585,7 @@ def generate_monthly_report_xlsx(company_name: str, candidates: list, events: li
             }
 
         monthly[ev_id]["applicants"] += 1
-        if c.get("application_status") == "ACCEPTED":
+        if normalize_status(c.get("application_status")) == "accepted":
             monthly[ev_id]["accepted"] += 1
 
         arrival = c.get("arrival_time") or "—"

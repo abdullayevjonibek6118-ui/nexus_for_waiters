@@ -20,3 +20,9 @@ logs/
 # IDE
 .vscode/
 .idea/
+
+# Local runtime/tool state
+bot_persistence.pickle
+.qwen/
+.ruff_cache/
+.pytest_cache/

@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional, List
 from database import get_db
 from models.candidate import Candidate
-from models.event_candidate import EventCandidate, ApplicationStatus, can_transition
+from models.event_candidate import ApplicationStatus, can_transition
 from utils.constants import VoteStatus
 from utils.exceptions import DatabaseError, NexusError
 
@@ -171,13 +171,16 @@ async def get_or_create_candidate(user_id: int, first_name: str,
         db = get_db()
         result = db.table("candidates").select("*").eq("user_id", user_id).execute()
         if result.data:
-            # Обновляем существующего кандидата
-            db.table("candidates").update({
+            # Обновляем существующего кандидата и возвращаем актуальные данные.
+            update_data = {
                 "first_name": first_name,
                 "last_name": last_name or "",
-                "telegram_username": username or ""
-            }).eq("user_id", user_id).execute()
-            return Candidate(**result.data[0])
+                "telegram_username": username or "",
+            }
+            updated = db.table("candidates").update(update_data).eq("user_id", user_id).execute()
+            if updated.data:
+                return Candidate(**updated.data[0])
+            return Candidate(**{**result.data[0], **update_data})
 
         new_candidate = {
             "user_id": user_id,

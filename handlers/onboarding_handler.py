@@ -9,8 +9,6 @@ from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, Mess
 from services import candidate_service, event_service, audit_service
 from utils.keyboards import (
     get_onboarding_start_keyboard,
-    get_dynamic_choice_keyboard,
-    get_onboarding_confirm_keyboard,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,6 +48,9 @@ async def handle_ob_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
         await update.callback_query.answer()
         message = update.callback_query.message
+        if update.callback_query.data and update.callback_query.data.startswith("ob_start:"):
+            event_id = update.callback_query.data.split(":", 1)[1]
+            context.user_data["ob_event_id"] = event_id
     else:
         message = update.message
 
@@ -66,7 +67,17 @@ async def handle_ob_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["ob_gender"] = existing_profile.gender
 
     event_id = context.user_data.get("ob_event_id")
-    event = await event_service.get_event(event_id)
+    if not event_id:
+        await message.reply_text("❌ Не удалось определить мероприятие. Откройте регистрацию по ссылке заново.")
+        return ConversationHandler.END
+
+    try:
+        event = await event_service.get_event(event_id)
+    except Exception as e:
+        logger.error(f"Onboarding start failed for event={event_id}: {e}")
+        await message.reply_text("❌ Мероприятие не найдено или больше недоступно.")
+        return ConversationHandler.END
+
     roles = event.required_roles or ["Промоутер", "Хостес", "Регистратор"]
 
     from utils.keyboards import get_onboarding_role_reply_keyboard
@@ -155,7 +166,7 @@ async def handle_gender_choice(update: Update, context: ContextTypes.DEFAULT_TYP
 
     from utils.keyboards import get_onboarding_time_reply_keyboard
     await update.message.reply_html(
-        f"⏰ <b>Шаг 5 из 5: Время прихода</b>\n\nВыберите удобное время начала смены:",
+        "⏰ <b>Шаг 5 из 5: Время прихода</b>\n\nВыберите удобное время начала смены:",
         reply_markup=get_onboarding_time_reply_keyboard(times)
     )
     return CHOOSE_TIME
@@ -274,7 +285,17 @@ async def handle_ob_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for key in ["ob_role", "ob_phone", "ob_full_name", "ob_time", "ob_gender"]:
             context.user_data.pop(key, None)
 
-    event = await event_service.get_event(event_id)
+    if not event_id:
+        await update.message.reply_text("❌ Не удалось определить мероприятие. Откройте регистрацию по ссылке заново.")
+        return ConversationHandler.END
+
+    try:
+        event = await event_service.get_event(event_id)
+    except Exception as e:
+        logger.error(f"Onboarding edit failed for event={event_id}: {e}")
+        await update.message.reply_text("❌ Мероприятие не найдено или больше недоступно.")
+        return ConversationHandler.END
+
     roles = event.required_roles or ["Промоутер", "Хостес", "Регистратор"]
 
     from utils.keyboards import get_onboarding_role_reply_keyboard
@@ -295,6 +316,18 @@ async def handle_ob_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return CHOOSE_ROLE
 
+async def cancel_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel onboarding and clear temporary registration state."""
+    for key in list(context.user_data):
+        if key.startswith("ob_"):
+            context.user_data.pop(key, None)
+    await update.effective_message.reply_text(
+        "Регистрация отменена.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    return ConversationHandler.END
+
+
 def get_onboarding_handler():
     return ConversationHandler(
         entry_points=[
@@ -309,7 +342,7 @@ def get_onboarding_handler():
             CHOOSE_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_time_choice)],
             CONFIRM_DATA: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ob_confirm_action)]
         },
-        fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
+        fallbacks=[CommandHandler("cancel", cancel_onboarding)],
         allow_reentry=True,
         name="candidate_onboarding",
         persistent=True

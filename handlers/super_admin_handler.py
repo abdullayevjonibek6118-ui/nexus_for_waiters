@@ -23,9 +23,7 @@ def is_super_admin(user_id: int) -> bool:
     # Fallback to admin list from settings (if any).
     if settings.admin_ids:
         return user_id in settings.admin_ids
-+    # Final fallback: hard‑coded owner ID (the main user of this OpenClaw instance).
-+    # Replace with the actual Telegram user ID of the bot owner if different.
-+    return user_id == 785809306
+    return False
 
 async def owner_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Главная панель владельца."""

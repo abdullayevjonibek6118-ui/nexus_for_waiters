@@ -6,8 +6,8 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from config import settings
-from utils.constants import VoteStatus, EventStatus
-from services import event_service, candidate_service, audit_service, recruiter_service
+from utils.constants import EventStatus
+from services import event_service, audit_service, recruiter_service
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ async def publish_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     event = await event_service.get_event(event_id)
     if not event:
-        await update.effective_message.reply_text(f"❌ Мероприятие не найдено.")
+        await update.effective_message.reply_text("❌ Мероприятие не найдено.")
         return
 
     try:

@@ -1,10 +1,8 @@
 """Модели данных для кандидатов."""
-from enum import Enum
 from typing import Optional
 from pydantic import BaseModel
 
 
-from utils.constants import VoteStatus
 
 
 class Candidate(BaseModel):

@@ -6,10 +6,9 @@ import os
 import asyncio
 import logging
 from telegram import Update
-from telegram.ext import ContextTypes, ApplicationBuilder
-from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 from config import settings
-from utils.constants import ApplicationStatus, EventStatus
+from utils.constants import EventStatus
 from services import (
     event_service,
     candidate_service,
@@ -152,8 +151,8 @@ async def payment_confirmed_cmd(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     await update.effective_message.reply_html(
-        f"✅ <b>Оплата подтверждена!</b>\n"
-        f"Напоминание отменено. Мероприятие завершено."
+        "✅ <b>Оплата подтверждена!</b>\n"
+        "Напоминание отменено. Мероприятие завершено."
     )
 
 

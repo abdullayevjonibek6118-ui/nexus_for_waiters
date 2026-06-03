@@ -101,6 +101,9 @@ async def schedule_daily_reminders(bot):
         tz = pytz.timezone(settings.timezone)
         tomorrow = (datetime.now(tz) + timedelta(days=1)).strftime("%Y-%m-%d")
 
+        # Lazy imports avoid service-level cycles during application startup.
+        from services import candidate_service, company_service, event_service
+
         # Получаем все активные мероприятия
         events = await event_service.get_active_events()
         for ev in events:

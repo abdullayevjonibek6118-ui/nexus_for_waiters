@@ -4,7 +4,7 @@ Nexus AI — Role Handler
 """
 from telegram import Update
 from telegram.ext import ContextTypes
-from services import recruiter_service, candidate_service
+from services import candidate_service
 from utils.keyboards import get_gender_inline_keyboard
 
 async def handle_role_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
