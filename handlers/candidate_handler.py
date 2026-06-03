@@ -469,7 +469,7 @@ async def handle_candidate_confirmation(update: Update, context: ContextTypes.DE
     action, event_id = data.split(":")
     user = query.from_user
 
-    if action == "inv_yes":
+    if action in ("inv_yes", "confirm_yes"):
         await candidate_service.transition_application(event_id, user.id, ApplicationStatus.CONFIRMED)
         await query.edit_message_text(
             "<b>Отлично!</b>\n\nВы записаны на мероприятие.\n\n"

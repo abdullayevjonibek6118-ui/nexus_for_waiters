@@ -48,6 +48,7 @@ from handlers.admin_handler import (
     payment_reminder_cmd,
     payment_confirmed_cmd,
     logs_cmd,
+    close_event_cmd,
     export_excel_cmd,
     announce_cmd,
 )
@@ -125,6 +126,7 @@ def main() -> None:
     app.add_handler(CommandHandler("payment_reminder", payment_reminder_cmd))
     app.add_handler(CommandHandler("payment_confirmed", payment_confirmed_cmd))
     app.add_handler(CommandHandler("logs", logs_cmd))
+    app.add_handler(CommandHandler("close_event", close_event_cmd))
     app.add_handler(CommandHandler("export_excel", export_excel_cmd))
     app.add_handler(CommandHandler("announce", announce_cmd))
 
@@ -133,13 +135,13 @@ def main() -> None:
     app.add_handler(get_super_admin_handler()) # ConversationHandler для создания компаний
 
     # ── Callback-кнопки ─────────────────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^inv_(yes|no):"))
+    app.add_handler(CallbackQueryHandler(handle_candidate_confirmation, pattern=r"^(inv|confirm)_(yes|no):"))
     app.add_handler(CallbackQueryHandler(
         handle_event_action_callback,
         pattern=r"^(poll_publish|select|times|sheet|notify|logs|close|manage|export_excel|export_company_report|ev_[a-zA-Z0-9_]+)(:|$)"
     ))
     app.add_handler(CallbackQueryHandler(handle_card_callback, pattern=r"^card_(accept|reject|next)"))
-    app.add_handler(CallbackQueryHandler(handle_checkin, pattern=r"^checkin_"))
+    app.add_handler(CallbackQueryHandler(handle_checkin, pattern=r"^checkin_start:"))
     app.add_handler(CallbackQueryHandler(handle_confirm_checkin_callback, pattern=r"^c_chk:"))
     app.add_handler(CallbackQueryHandler(handle_set_gender, pattern=r"^set_gender:"))
     app.add_handler(CallbackQueryHandler(handle_role_callback, pattern=r"^role:"))

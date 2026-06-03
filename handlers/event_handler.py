@@ -577,15 +577,7 @@ async def handle_event_action_callback(update: Update, context: ContextTypes.DEF
     if action == "manage":
         event = await event_service.get_event(event_id)
         if event:
-            from utils.keyboards import get_event_post_creation_keyboard
-            text = (
-                f"📌 <b>{event.title}</b>\n"
-                f"📅 Дата: {event.date}\n"
-                f"📍 Место: {event.location}\n"
-                f"👥 Лимит: {event.max_candidates} чел.\n"
-                f"📊 Статус: {event.status.value}"
-            )
-            await query.message.reply_html(text, reply_markup=get_event_post_creation_keyboard())
+            await show_event_management_menu(update, context, event_id)
 
     elif action == "ev_publish" or action == "poll_publish":
         from handlers.poll_handler import publish_poll

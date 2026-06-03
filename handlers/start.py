@@ -26,28 +26,28 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         existing_app = await candidate_service.get_event_candidate(event_id, user_id)
 
         if existing_app:
-            status = existing_app.get("application_status", "")
+            status = (existing_app.get("application_status") or "").lower()
             role = existing_app.get("role", "")
             arrival = existing_app.get("arrival_time", "")
 
             # Терминальные статусы — нельзя перерегистрироваться
-            terminal_statuses = {"REJECTED", "DECLINED", "CHECKED_IN"}
+            terminal_statuses = {"rejected", "declined", "checked_in"}
             if status in terminal_statuses:
                 status_messages = {
-                    "REJECTED": "❌ К сожалению, ваша заявка была отклонена.",
-                    "DECLINED": "⚠️ Вы ранее отказались от участия в этом мероприятии.",
-                    "CHECKED_IN": "✅ Вы уже отметились на этом мероприятии. Хорошей смены!"
+                    "rejected": "❌ К сожалению, ваша заявка была отклонена.",
+                    "declined": "⚠️ Вы ранее отказались от участия в этом мероприятии.",
+                    "checked_in": "✅ Вы уже отметились на этом мероприятии. Хорошей смены!"
                 }
                 await update.message.reply_text(status_messages.get(status, "Ваш статус: " + status))
                 return
 
             # Нетерминальные статусы — пользователь уже зарегистрирован
             active_messages = {
-                "PENDING": "⏳ Ваша заявка на участие уже принята и ожидает рассмотрения.",
-                "ACCEPTED": "✅ Вы уже приняты на это мероприятие!",
-                "SCHEDULED": "⏰ Вам уже назначено время. Ожидайте приглашения.",
-                "INVITED": "📨 Вам уже отправлено приглашение. Проверьте чат с ботом.",
-                "CONFIRMED": "✅ Вы уже подтвердили участие. Ждём вас в день мероприятия!"
+                "pending": "⏳ Ваша заявка на участие уже принята и ожидает рассмотрения.",
+                "accepted": "✅ Вы уже приняты на это мероприятие!",
+                "scheduled": "⏰ Вам уже назначено время. Ожидайте приглашения.",
+                "invited": "📨 Вам уже отправлено приглашение. Проверьте чат с ботом.",
+                "confirmed": "✅ Вы уже подтвердили участие. Ждём вас в день мероприятия!"
             }
 
             role_info = f"\n🎭 Роль: {role}" if role else ""
